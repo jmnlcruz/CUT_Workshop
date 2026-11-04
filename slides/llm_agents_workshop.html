@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building LLM Agents</title>
+<style>
+:root{
+  --ink:#1E1B4B; --dark:#1E293B; --violet:#6D28D9; --lav:#A78BFA; --cyan:#0891B2; --sky:#22D3EE; --amber:#D97706;
+  --slate:#64748B; --paper:#F5F3FF; --line:#E2E8F0; --red:#DC2626; --green:#059669;
+  --sans: Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: Consolas, "Cascadia Mono", Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0f0d2e;font-family:var(--sans);overflow:hidden}
+button,select,input,textarea{font-family:inherit}
+
+/* ---------- stage / scaling ---------- */
+#viewport{position:fixed;left:0;right:0;top:0;bottom:56px;overflow:hidden}
+#deck{position:absolute;width:1280px;height:720px;transform-origin:0 0;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5);border-radius:6px;overflow:hidden}
+.slide{position:absolute;inset:0;padding:40px 64px 44px 76px;background:#fff;color:var(--ink);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateX(30px);transition:opacity .35s ease, transform .35s ease, visibility 0s linear .35s}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .35s ease, transform .35s ease}
+.slide.before{transform:translateX(-30px)}
+.slide::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:linear-gradient(var(--violet),var(--cyan))}
+.kick{font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase;margin-bottom:6px}
+.slide h2{font-size:42px;font-weight:700;margin:0;color:var(--ink);line-height:1.1}
+.slide .sub{color:var(--violet);font-size:21px;margin:8px 0 0}
+.slide .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:20px;margin-top:16px;min-height:0}
+.foot{position:absolute;right:26px;bottom:14px;font-size:12px;color:var(--slate);letter-spacing:.04em}
+.badge{display:inline-block;align-self:flex-start;background:var(--amber);color:#fff;font-size:12px;font-weight:700;letter-spacing:.12em;padding:3px 10px;border-radius:4px;margin-bottom:8px}
+.card{background:var(--paper);border:1px solid #DDD6FE;border-radius:12px;padding:20px 22px}
+.card h3{font-size:24px;margin:8px 0 8px;color:var(--ink)}
+.card p{margin:0;font-size:18px;line-height:1.4;color:#334155}
+.emoji{font-size:34px;line-height:1}
+.callout{background:var(--ink);color:#fff;border-left:6px solid var(--sky);padding:14px 22px;border-radius:8px;font-size:19px;line-height:1.35}
+.callout b{color:var(--sky)}
+.note{font-size:16px;color:var(--slate)}
+.row{display:flex;gap:22px}
+.grow{flex:1}
+.btn{border:1px solid var(--violet);background:#fff;color:var(--violet);padding:6px 14px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.btn:hover:not(:disabled){background:var(--paper)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--violet);color:#fff}
+.btn.primary:hover:not(:disabled){background:#5B21B6}
+.btn.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ctrl{display:flex;align-items:center;gap:10px;font-size:16px;color:#334155}
+input[type=range]{accent-color:var(--violet);width:170px}
+code,.code{font-family:var(--mono)}
+svg text{font-family:var(--sans)}
+pre.codeblock{margin:0;background:var(--dark);color:#E2E8F0;border-radius:10px;padding:14px 18px;font-size:16px;line-height:1.5;font-family:var(--mono);white-space:pre;overflow:auto}
+.kw{color:#C4B5FD}.str{color:#FDE68A}.fn{color:#67E8F9}.cm{color:#94A3B8}.dec{color:#FDBA74}
+.panel{background:#FAFAFF;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.panel h4{margin:0 0 8px;font-size:19px}
+.pill{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.1em;padding:3px 9px;border-radius:4px;color:#fff}
+.p-th{background:var(--violet)} .p-ac{background:var(--cyan)} .p-ob{background:var(--amber)} .p-fa{background:var(--green)}
+.repo{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink);background:#fff;border:2px solid var(--violet);border-radius:10px;padding:12px 18px;font-size:18px;font-weight:600;transition:background .15s}
+.repo:hover{background:var(--paper)}
+.repo code{color:var(--violet);font-size:17px;font-weight:400}
+
+/* ---------- title ---------- */
+.title-slide{background:radial-gradient(1000px 600px at 80% 20%, #3b1f8f 0%, var(--ink) 55%, #0f0d2e 100%);color:#fff;justify-content:center}
+.title-slide::before{background:var(--sky)}
+.title-slide .k{color:var(--sky);letter-spacing:.2em;font-size:16px;font-weight:700}
+.title-slide h1{font-size:76px;line-height:1.02;margin:16px 0 18px;font-weight:700}
+.title-slide h1 span{color:var(--lav)}
+.title-slide .meta{font-size:22px;color:#C7D2FE;margin-bottom:10px}
+.title-slide .lead{font-size:19px;color:#94A3B8}
+.title-slide svg{position:absolute;right:50px;top:120px;width:440px}
+
+/* ---------- workshop map ---------- */
+.map{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;position:relative}
+.map .it{background:var(--paper);border:1px solid #DDD6FE;border-radius:12px;padding:18px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;position:relative}
+.map .it:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(109,40,217,.18);border-color:var(--violet)}
+.map .t{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--violet)}
+.map .s{font-size:13px;font-weight:700;letter-spacing:.16em;color:var(--cyan);margin:8px 0 6px}
+.map p{margin:0;font-size:18px;line-height:1.35;color:#334155}
+.mapbar{display:flex;height:14px;border-radius:7px;overflow:hidden}
+
+/* ---------- misc layout ---------- */
+.flowh{display:flex;align-items:center;gap:8px}
+.fbox{background:#fff;border:2px solid var(--line);border-radius:10px;padding:10px 14px;text-align:center;font-weight:700;font-size:16px}
+.fbox.v{border-color:var(--violet);background:var(--paper)} .fbox.c{border-color:var(--cyan);background:#ECFEFF} .fbox.a{border-color:var(--amber);background:#FFFBEB}
+.fbox.ink{background:var(--ink);color:#fff;border-color:var(--ink)}
+.arr{color:var(--violet);font-weight:700;font-size:22px}
+.chat{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:70%;padding:10px 16px;border-radius:14px;font-size:18px;line-height:1.35}
+.msg b{display:block;font-size:12px;letter-spacing:.1em;opacity:.75;margin-bottom:2px}
+.msg.h{align-self:flex-end;background:var(--violet);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#F1F5F9;color:var(--ink);border-bottom-left-radius:4px}
+.msg.bad{background:#FEE2E2;border:1px solid #FCA5A5}
+.msg.good{background:#D1FAE5;border:1px solid #6EE7B7}
+.callsep{align-self:center;font-size:12px;color:var(--slate);font-family:var(--mono);border-top:1px dashed var(--line);width:100%;text-align:center;padding-top:4px}
+.trace{display:flex;flex-direction:column;gap:9px}
+.trace .ln{display:flex;gap:14px;align-items:flex-start;font-size:18px;line-height:1.35}
+.trace .ln .pill{flex:none;width:118px;text-align:center;margin-top:2px}
+.memtype{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:10px;border:1px solid var(--line);background:#fff}
+.memtype b{font-family:var(--mono);font-size:17px;color:var(--violet)}
+.memtype span{font-size:15.5px;color:var(--slate)}
+.memtype.used{border:2px solid var(--violet);background:var(--paper)}
+.agbox{border:2px dashed var(--violet);border-radius:16px;padding:16px;position:relative;background:#FCFBFF}
+.agbox .lbl{position:absolute;top:-13px;left:18px;background:#fff;padding:0 8px;font-weight:700;letter-spacing:.14em;font-size:13px;color:var(--violet)}
+.toolchip{font-family:var(--mono);font-size:14px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;padding:5px 8px;text-align:center}
+.agenda14{display:flex;flex-direction:column;gap:12px}
+.agenda14 .r{display:grid;grid-template-columns:130px 50px 1fr;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:var(--paper);border:1px solid #DDD6FE}
+.agenda14 .tm{font-family:var(--mono);font-weight:700;color:var(--violet);font-size:17px}
+.agenda14 .r b{font-size:20px;display:block}
+.agenda14 .r span{font-size:16px;color:var(--slate)}
+
+/* interactive bits */
+.tokens{font-family:var(--mono);font-size:22px;background:var(--dark);color:#E2E8F0;border-radius:10px;padding:16px 20px;min-height:64px;line-height:1.6}
+.tokens .tk{background:rgba(167,139,250,.25);border:1px solid rgba(167,139,250,.6);border-radius:5px;padding:1px 4px;margin-right:2px}
+.tokens .tk.new{background:var(--amber);color:#fff;border-color:var(--amber)}
+.probrow{display:grid;grid-template-columns:120px 1fr 64px;gap:10px;align-items:center;font-size:17px;margin:6px 0}
+.probrow .bar{height:22px;background:#EEF2F6;border-radius:5px;overflow:hidden}
+.probrow .bar i{display:block;height:100%;background:var(--lav);transition:width .3s}
+.probrow.top .bar i{background:var(--violet)}
+.probrow .v{font-family:var(--mono);text-align:right}
+textarea.tpl{width:100%;font-family:var(--mono);font-size:18px;padding:10px 12px;border:2px solid #DDD6FE;border-radius:8px;resize:none;color:var(--ink)}
+.varrow{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;margin:6px 0}
+.varrow label{font-family:var(--mono);color:var(--violet);font-weight:700}
+.varrow input{font-size:17px;padding:6px 10px;border:1px solid var(--line);border-radius:6px}
+.filled{font-family:var(--mono);font-size:18px;background:var(--dark);color:#E2E8F0;border-radius:10px;padding:14px 18px;line-height:1.5;white-space:pre-wrap;min-height:70px}
+.filled mark{background:var(--amber);color:#fff;border-radius:4px;padding:0 4px}
+.filled .miss{background:var(--red);color:#fff;border-radius:4px;padding:0 4px}
+.scratch{font-family:var(--mono);font-size:15.5px;background:var(--dark);color:#E2E8F0;border-radius:10px;padding:14px 16px;line-height:1.5;white-space:pre-wrap;height:400px;overflow:auto}
+.scratch .q{color:#fff;font-weight:700} .scratch .th{color:#C4B5FD} .scratch .ac{color:#67E8F9} .scratch .ob{color:#FCD34D} .scratch .fa{color:#6EE7B7;font-weight:700}
+.scratch .newline{background:rgba(255,255,255,.08);border-radius:4px}
+.tabs{display:flex;gap:6px}
+.prompt{font-family:var(--mono);font-size:14.5px;background:var(--dark);color:#E2E8F0;border-radius:10px;padding:12px 14px;line-height:1.45;white-space:pre-wrap;height:300px;overflow:auto}
+.prompt .hist{color:#FCD34D} .prompt .sum{color:#6EE7B7} .prompt .cur{color:#fff;font-weight:700} .prompt .sys{color:#94A3B8}
+.meter{height:14px;background:#EEF2F6;border-radius:7px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--violet);transition:width .3s}
+
+/* ---------- nav ---------- */
+#nav{position:fixed;left:0;right:0;bottom:0;height:56px;background:#0b0a24;border-top:1px solid #272363;display:flex;align-items:center;gap:8px;padding:0 14px;color:#CBD5E1;z-index:5}
+#nav button{background:#1a1748;color:#E2E8F0;border:1px solid #2e2a78;border-radius:8px;height:38px;min-width:42px;padding:0 12px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:6px}
+#nav button:hover:not(:disabled){background:#28226b;border-color:var(--lav)}
+#nav button:disabled{opacity:.35;cursor:default}
+#nav .primary{background:var(--violet);border-color:var(--violet)}
+#nav .center{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-width:0}
+#topicLabel{font-size:15px;color:var(--lav);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#counter{font-family:var(--mono);font-size:14px;color:#94A3B8;white-space:nowrap}
+#progress{position:fixed;left:0;bottom:56px;height:3px;background:var(--lav);transition:width .3s;z-index:6}
+#menu{position:fixed;left:0;top:0;bottom:56px;width:340px;max-width:90vw;background:#0b0a24;border-right:1px solid #272363;color:#E2E8F0;transform:translateX(-100%);transition:transform .25s;z-index:7;overflow:auto;padding:16px 0}
+#menu.open{transform:none}
+#menu h5{margin:14px 18px 4px;font-size:12px;letter-spacing:.14em;color:var(--lav);text-transform:uppercase}
+#menu a{display:flex;gap:10px;padding:6px 18px 6px 26px;font-size:14.5px;color:#CBD5E1;cursor:pointer}
+#menu a:hover{background:#1a1748}
+#menu a.cur{background:#28226b;color:#fff;border-left:3px solid var(--lav);padding-left:23px}
+#menu a i{font-style:normal;font-family:var(--mono);color:#64748B;width:22px;flex:none}
+#menu a em{font-style:normal;font-size:11px;background:var(--amber);color:#fff;border-radius:3px;padding:0 5px;margin-left:auto;align-self:center;font-weight:700}
+@media (max-width:640px){ #nav .hide-sm{display:none} #topicLabel{display:none} }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="deck">
+
+<!-- ===================== 1. TITLE ===================== -->
+<section class="slide title-slide" data-topic="Introduction" data-src="1" data-title="Building LLM Agents with LangChain">
+  <div style="max-width:660px;position:relative;z-index:1">
+    <div class="k">HANDS-ON WORKSHOP</div>
+    <h1>Building LLM Agents<br><span>with LangChain</span></h1>
+    <div class="meta">Google Colab &nbsp;·&nbsp; OpenAI gpt-4o-mini &nbsp;·&nbsp; 40 Minutes</div>
+    <div class="lead">Conceptual foundations before the hands-on notebook</div>
+  </div>
+  <svg viewBox="0 0 440 440" aria-hidden="true">
+    <circle cx="220" cy="220" r="150" fill="none" stroke="#6D28D9" stroke-width="3" stroke-dasharray="10 8"/>
+    <g font-size="18" font-weight="700" text-anchor="middle">
+      <circle cx="220" cy="70" r="46" fill="#6D28D9"/><text x="220" y="76" fill="#fff">Thought</text>
+      <circle cx="350" cy="295" r="46" fill="#0891B2"/><text x="350" y="301" fill="#fff">Action</text>
+      <circle cx="90" cy="295" r="46" fill="#D97706"/><text x="90" y="301" fill="#fff" font-size="15">Observe</text>
+    </g>
+    <circle cx="220" cy="220" r="52" fill="#1E1B4B" stroke="#22D3EE" stroke-width="3"/>
+    <text x="220" y="227" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">Agent</text>
+  </svg>
+</section>
+
+<!-- ===================== 2. WORKSHOP MAP ===================== -->
+<section class="slide" data-topic="Introduction" data-src="2" data-title="Workshop Map">
+  <h2>Workshop Map</h2>
+  <p class="sub">Click a block to jump to its concepts</p>
+  <div class="body" style="gap:18px">
+    <div class="mapbar"><div style="flex:5;background:#94A3B8"></div><div style="flex:10;background:var(--violet)"></div><div style="flex:15;background:var(--cyan)"></div><div style="flex:10;background:var(--amber)"></div></div>
+    <div class="map">
+      <div class="it" data-goto="Notebook"><div class="t">0:00</div><div class="s">SETUP</div><p>Install packages + configure OpenAI API key</p></div>
+      <div class="it" data-goto="Section 1 · LLM Basics"><div class="t">0:05</div><div class="s">SECTION 1</div><p><b>LLM Basics</b> — Prompts, Templates, Chains</p></div>
+      <div class="it" data-goto="Section 2 · Agents & Tools"><div class="t">0:15</div><div class="s">SECTION 2</div><p><b>Agents &amp; Tools</b> — ReAct pattern, AgentExecutor</p></div>
+      <div class="it" data-goto="Section 3 · Memory"><div class="t">0:30</div><div class="s">SECTION 3</div><p><b>Memory</b> — Stateful multi-turn conversations</p></div>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="pill" style="background:var(--violet)">NOTEBOOKS</span><span>Workshop repository:</span>
+      <code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+  </div>
+</section>
+
+<!-- ===================== 3. WHAT IS AN LLM ===================== -->
+<section class="slide" data-topic="Section 1 · LLM Basics" data-src="3" data-title="What is a Large Language Model?">
+  <div class="kick">Section 1</div>
+  <h2>What is a Large Language Model?</h2>
+  <div class="body">
+    <div class="row" style="gap:40px;align-items:center">
+      <div class="grow" style="font-size:19px;line-height:1.45;color:#334155">
+        <b style="color:var(--ink)">The core idea:</b> an LLM is a function:
+        <div style="font-family:var(--mono);font-size:22px;margin:12px 0;color:var(--violet);font-weight:700">Text In → [ LLM ] → Text Out</div>
+        Trained on vast amounts of text, it learns to <b>predict what comes next</b> — and follows instruction-style prompts.
+        <div style="margin-top:18px;font-weight:700;color:var(--ink)">Key properties:</div>
+        <ul style="margin:6px 0 0;padding-left:22px;line-height:1.6">
+          <li><b>Generative</b> — creates novel text</li>
+          <li><b>Instruction-following</b> — responds to task prompts</li>
+          <li><b>Context-aware</b> — uses the full prompt as context</li>
+        </ul>
+      </div>
+      <div style="width:420px;display:flex;flex-direction:column;align-items:stretch;gap:8px">
+        <div class="note" style="font-weight:700;letter-spacing:.12em;font-size:13px">INPUT PROMPT</div>
+        <div class="fbox v" style="font-family:var(--mono);font-weight:400;font-size:18px">"Translate to French:<br>Hello, world."</div>
+        <div style="text-align:center;color:var(--violet);font-size:22px">▼</div>
+        <div class="fbox ink" style="font-size:20px">LLM &nbsp;(gpt-4o-mini)</div>
+        <div style="text-align:center;color:var(--violet);font-size:22px">▼</div>
+        <div class="fbox c" style="font-family:var(--mono);font-weight:400;font-size:18px">"Bonjour, le monde."</div>
+        <div class="note" style="font-weight:700;letter-spacing:.12em;font-size:13px;text-align:right">OUTPUT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 3b. NEXT TOKEN ===================== -->
+<section class="slide diagram" data-topic="Section 1 · LLM Basics" data-title="Next-Token Prediction" id="s-tok">
+  <h2>Next-Token Prediction, Step by Step</h2>
+  <p class="sub">The model never writes a whole sentence at once: it picks one token, appends it, and repeats</p>
+  <div class="body" style="gap:14px;justify-content:flex-start;margin-top:14px">
+    <div class="tokens" id="tokOut"></div>
+    <div class="row" style="gap:28px">
+      <div class="panel grow">
+        <h4>Probabilities for the next token <span class="note" id="tokStep"></span></h4>
+        <div id="tokProbs"></div>
+      </div>
+      <div style="width:360px;display:flex;flex-direction:column;gap:12px">
+        <button class="btn primary" id="tokNext">Predict next token ▶</button>
+        <button class="btn" id="tokReset">↺ Reset</button>
+        <label class="ctrl">Temperature <input type="range" id="tokT" min="0.2" max="2" step="0.1" value="1"> <b id="tokTV" class="code">1.0</b></label>
+        <p class="note" style="margin:0;line-height:1.45"><b>Low temperature</b> sharpens the distribution (predictable). <b>High temperature</b> flattens it (more creative / random). Here we always pick the top token (greedy). Numbers are illustrative.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 4. WHY LANGCHAIN ===================== -->
+<section class="slide" data-topic="Section 1 · LLM Basics" data-src="4" data-title="Why LangChain?">
+  <div class="kick">Section 1</div>
+  <h2>Why LangChain?</h2>
+  <p class="sub">A framework that makes LLMs easy to compose, connect, and control.</p>
+  <div class="body">
+    <div class="row">
+      <div class="card grow"><div class="emoji">📝</div><h3>Prompt Templates</h3><p>Reusable, parameterized prompts — fill variables at runtime, no string hacks.</p></div>
+      <div class="card grow"><div class="emoji">⛓️</div><h3>Chains</h3><p>Compose prompt + LLM into one callable unit. Chain multiple steps together.</p></div>
+      <div class="card grow"><div class="emoji">🤖</div><h3>Agents</h3><p>LLMs that decide which tools to call. They reason, act, and observe in a loop.</p></div>
+    </div>
+    <div class="flowh" style="justify-content:center;font-size:16px;color:var(--slate)">
+      <span class="fbox v">Template</span><span class="arr">+</span><span class="fbox ink">LLM</span><span class="arr">=</span><span class="fbox v">Chain</span>
+      <span class="arr" style="margin:0 10px">→</span>
+      <span class="fbox ink">LLM</span><span class="arr">+</span><span class="fbox a">Tools</span><span class="arr">+</span><span class="fbox c">Loop</span><span class="arr">=</span><span class="fbox v">Agent</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 5. TEMPLATES & CHAINS ===================== -->
+<section class="slide" data-topic="Section 1 · LLM Basics" data-src="5" data-title="Prompt Templates & Chains">
+  <div class="kick">Section 1</div>
+  <h2>Prompt Templates &amp; Chains</h2>
+  <div class="body">
+    <div class="row" style="gap:28px">
+      <div class="card grow" style="display:flex;flex-direction:column;gap:12px">
+        <h3 style="margin:0;font-family:var(--mono);color:var(--violet)">PromptTemplate</h3>
+        <pre class="codeblock">template = <span class="str">"Explain {topic}
+            for a {audience}."</span></pre>
+        <div style="text-align:center;color:var(--violet);font-weight:700">▼ fill variables at runtime</div>
+        <div class="fbox c" style="font-family:var(--mono);font-weight:400;font-size:17px;text-align:left">"Explain neural networks<br>for a high school student."</div>
+        <div style="color:var(--green);font-weight:700;font-size:17px">✓ Reusable &nbsp; ✓ Type-safe &nbsp; ✓ No string hacks</div>
+      </div>
+      <div class="card grow" style="display:flex;flex-direction:column;gap:12px">
+        <h3 style="margin:0;font-family:var(--mono);color:var(--violet)">LLMChain</h3>
+        <div class="flowh" style="justify-content:space-between">
+          <span class="fbox">Input<br>Vars</span><span class="arr">→</span><span class="fbox v">Prompt<br>Template</span><span class="arr">→</span><span class="fbox ink">LLM</span><span class="arr">→</span><span class="fbox c">Output<br>Text</span>
+        </div>
+        <div class="note" style="text-align:center">chain = template + LLM, bundled as one object</div>
+<pre class="codeblock">chain = <span class="fn">LLMChain</span>(
+    llm=llm, prompt=template)
+result = chain.<span class="fn">invoke</span>({
+    <span class="str">"topic"</span>: <span class="str">"neural nets"</span>,
+    <span class="str">"audience"</span>: <span class="str">"student"</span>})</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 5b. TEMPLATE PLAYGROUND ===================== -->
+<section class="slide diagram" data-topic="Section 1 · LLM Basics" data-title="Template Playground">
+  <h2>PromptTemplate Playground</h2>
+  <p class="sub">Edit the template: every <code>{variable}</code> becomes an input. This is what the chain sends to the LLM.</p>
+  <div class="body" style="gap:14px;justify-content:flex-start;margin-top:14px">
+    <textarea class="tpl" id="tplText" rows="2" spellcheck="false">Explain {topic} for a {audience}. Use at most {n} sentences.</textarea>
+    <div class="row" style="gap:24px">
+      <div class="panel" style="width:460px">
+        <h4>input_variables = <span class="code" id="tplVarsList" style="color:var(--violet);font-size:16px"></span></h4>
+        <div id="tplVars"></div>
+      </div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:10px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">FORMATTED PROMPT → sent to the LLM</div>
+        <div class="filled" id="tplOut"></div>
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">EQUIVALENT CALL</div>
+        <pre class="codeblock" id="tplCode" style="font-size:15px"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6. CHAINS VS AGENTS ===================== -->
+<section class="slide" data-topic="Section 2 · Agents & Tools" data-src="6" data-title="Chains vs. Agents">
+  <div class="kick">Section 2</div>
+  <h2>Chains vs. Agents</h2>
+  <div class="body">
+    <div class="row" style="gap:28px">
+      <div class="card grow" style="display:flex;flex-direction:column;gap:10px">
+        <h3 style="margin:0">⛓️ &nbsp;Chain</h3>
+        <p><b>Predetermined steps.</b> Runs the same way every time.</p>
+        <p style="font-size:16.5px"><b>Best for:</b> structured pipelines · predictable workflows · fast, deterministic tasks</p>
+        <div class="flowh" style="justify-content:center;margin-top:10px"><span class="fbox v">Step 1</span><span class="arr">→</span><span class="fbox v">Step 2</span><span class="arr">→</span><span class="fbox v">Step 3</span></div>
+        <div class="note" style="text-align:center">Always the same path</div>
+      </div>
+      <div class="card grow" style="display:flex;flex-direction:column;gap:10px;background:#ECFEFF;border-color:#A5F3FC">
+        <h3 style="margin:0">🤖 &nbsp;Agent</h3>
+        <p><b>Dynamic steps.</b> LLM decides what to do next.</p>
+        <p style="font-size:16.5px"><b>Best for:</b> questions requiring tool use · multi-step reasoning · open-ended tasks</p>
+        <div class="flowh" style="justify-content:center;margin-top:10px"><span class="fbox v">Reason</span><span class="arr">→</span><span class="fbox c">Act</span><span class="arr">→</span><span class="fbox a">Observe</span></div>
+        <div class="note" style="text-align:center">↺ repeats until answer found</div>
+      </div>
+    </div>
+    <div class="callout">A chain is a <b>fixed recipe</b>; an agent is a <b>cook who decides</b> the next step after tasting the dish.</div>
+  </div>
+</section>
+
+<!-- ===================== 7. REACT ===================== -->
+<section class="slide" data-topic="Section 2 · Agents & Tools" data-src="7" data-title="The ReAct Pattern">
+  <div class="kick">Section 2</div>
+  <h2>The ReAct Pattern</h2>
+  <p class="sub"><b>ReAct = Reason + Act</b> — the model thinks, then acts, then observes the result.</p>
+  <div class="body">
+    <div class="row" style="align-items:stretch;gap:12px">
+      <div class="card grow" style="border-top:5px solid var(--violet)"><span class="pill p-th">1</span><h3>Thought</h3><p>LLM reasons about what it knows and what it still needs</p></div>
+      <div class="arr" style="align-self:center">→</div>
+      <div class="card grow" style="border-top:5px solid var(--cyan)"><span class="pill p-ac">2</span><h3>Action</h3><p>LLM picks a tool and provides the exact input to call</p></div>
+      <div class="arr" style="align-self:center">→</div>
+      <div class="card grow" style="border-top:5px solid var(--amber)"><span class="pill p-ob">3</span><h3>Observation</h3><p>The tool runs and returns a result back to the model</p></div>
+    </div>
+    <div class="flowh" style="justify-content:center;gap:16px;font-size:18px">
+      <span style="color:var(--violet);font-weight:700">↺ repeat until enough information</span><span class="arr">→</span>
+      <span class="fbox" style="background:var(--green);color:#fff;border-color:var(--green);font-size:19px">Final Answer</span>
+    </div>
+    <p class="note" style="margin:0">Source: “ReAct: Synergizing Reasoning and Acting in Language Models” — Yao et al., 2022</p>
+  </div>
+</section>
+
+<!-- ===================== 8. TOOLS ===================== -->
+<section class="slide" data-topic="Section 2 · Agents & Tools" data-src="8" data-title="Tools — Extending the LLM">
+  <div class="kick">Section 2</div>
+  <h2>Tools — Extending the LLM</h2>
+  <p class="sub">LLMs are great at reasoning — bad at precision tasks (exact math, live data, code). Tools bridge that gap.</p>
+  <div class="body">
+    <div class="row">
+      <div class="card grow"><div class="emoji">🧮</div><h3><code style="color:var(--amber)">@tool</code> calculator</h3><p>Evaluates math expressions. No hallucinated numbers.</p>
+        <pre class="codeblock" style="margin-top:14px;font-size:15px">calculator(<span class="str">'math.sqrt(256)'</span>)
+<span class="cm">→</span> 16.0</pre></div>
+      <div class="card grow"><div class="emoji">🌍</div><h3><code style="color:var(--amber)">@tool</code> capital_lookup</h3><p>Queries a dictionary for capitals — deterministic, always right.</p>
+        <pre class="codeblock" style="margin-top:14px;font-size:15px">capital_lookup(<span class="str">'france'</span>)
+<span class="cm">→</span> <span class="str">'Paris'</span></pre></div>
+      <div class="card grow"><div class="emoji">📝</div><h3><code style="color:var(--amber)">@tool</code> word_counter</h3><p>Counts words in a string — simple but illustrative.</p>
+        <pre class="codeblock" style="margin-top:14px;font-size:15px">word_counter(<span class="str">'hello world'</span>)
+<span class="cm">→</span> <span class="str">'2 words'</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 8b. TOOL ANATOMY ===================== -->
+<section class="slide diagram" data-topic="Section 2 · Agents & Tools" data-title="Anatomy of a Tool">
+  <h2>Anatomy of a Tool</h2>
+  <p class="sub">The LLM never runs your Python. It only reads the tool's <b>name</b>, <b>description</b> and <b>arguments</b>.</p>
+  <div class="body" style="gap:12px;justify-content:flex-start;margin-top:14px">
+    <div class="tabs" id="toolTabs"></div>
+    <div class="row" style="gap:10px;align-items:stretch;height:360px">
+      <div style="width:380px;display:flex;flex-direction:column;gap:6px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">1 · YOUR PYTHON FUNCTION</div>
+        <pre class="codeblock" id="toolCode" style="flex:1;font-size:14.5px;white-space:pre-wrap"></pre>
+      </div>
+      <div class="arr" style="align-self:center">→</div>
+      <div style="width:300px;display:flex;flex-direction:column;gap:6px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">2 · TOOL OBJECT (from @tool)</div>
+        <div class="panel" id="toolObj" style="flex:1;font-size:15.5px;display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div class="arr" style="align-self:center">→</div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">3 · WHAT THE LLM SEES IN ITS PROMPT</div>
+        <pre class="codeblock" id="toolPrompt" style="flex:1;font-size:13.5px;white-space:pre-wrap;line-height:1.4"></pre>
+      </div>
+    </div>
+    <div class="callout" style="font-size:17px;padding:10px 20px"><b>The docstring is the instruction manual.</b> A vague description → the agent picks the wrong tool or passes bad input.</div>
+  </div>
+</section>
+
+<!-- ===================== 9. TRACE ===================== -->
+<section class="slide" data-topic="Section 2 · Agents & Tools" data-src="9" data-title="ReAct in Action — A Concrete Trace">
+  <div class="kick">Section 2</div>
+  <h2>ReAct in Action — A Concrete Trace</h2>
+  <p class="sub"><b>Question:</b> “What is the capital of Japan and how many letters does its name have?”</p>
+  <div class="body">
+    <div class="trace">
+      <div class="ln"><span class="pill p-th">THOUGHT</span><span>I need to find Japan's capital. I'll use <code>capital_lookup</code> first.</span></div>
+      <div class="ln"><span class="pill p-ac">ACTION</span><span><code>capital_lookup("japan")</code> &nbsp;→&nbsp; <b style="color:var(--amber)">Observation:</b> "Tokyo"</span></div>
+      <div class="ln"><span class="pill p-th">THOUGHT</span><span>Good. Now I need to count the letters in "Tokyo". I'll use <code>word_counter</code>.</span></div>
+      <div class="ln"><span class="pill p-ac">ACTION</span><span><code>word_counter("Tokyo")</code> &nbsp;→&nbsp; <b style="color:var(--amber)">Observation:</b> "1 word" &nbsp;/&nbsp; len = 5 letters</span></div>
+      <div class="ln" style="margin-top:6px"><span class="pill p-fa">FINAL ANSWER</span><span style="font-weight:700">The capital of Japan is Tokyo. It has 5 letters.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 9b. TRACE PLAYER ===================== -->
+<section class="slide diagram" data-topic="Section 2 · Agents & Tools" data-title="Trace Player: The Loop Behind the Answer" id="s-trace">
+  <h2>Trace Player: The Loop Behind the Answer</h2>
+  <p class="sub">Step through the same question and watch the loop turn and the scratchpad grow</p>
+  <div class="body" style="flex-direction:row;gap:24px;align-items:stretch;margin-top:12px">
+    <div style="width:470px;flex:none;display:flex;flex-direction:column;gap:10px">
+      <svg id="trSvg" viewBox="0 0 470 360" style="width:100%"></svg>
+      <div class="row" style="gap:10px;align-items:center">
+        <button class="btn" id="trPrev">◀ Back</button>
+        <button class="btn primary" id="trNext">Next step ▶</button>
+        <span class="note" id="trCount" style="margin-left:auto"></span>
+      </div>
+      <div class="panel" id="trExplain" style="font-size:16.5px;line-height:1.4;padding:10px 14px"></div>
+    </div>
+    <div class="grow" style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">AGENT SCRATCHPAD (re-sent to the LLM on every call)</div>
+      <div class="scratch" id="trScratch"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 10. AGENTEXECUTOR ===================== -->
+<section class="slide" data-topic="Section 2 · Agents & Tools" data-src="10" data-title="AgentExecutor — LangChain Automates the Loop">
+  <div class="kick">Section 2</div>
+  <h2>AgentExecutor — LangChain Automates the Loop</h2>
+  <div class="body">
+    <div class="row" style="align-items:stretch;gap:16px">
+      <div class="grow" style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:700;font-size:18px">Manual loop (what we built):</div>
+<pre class="codeblock" style="flex:1"><span class="kw">while not</span> done:
+    think(question + history)
+    tool, inp = pick_tool()
+    obs = tool.run(inp)
+    history.append(obs)
+<span class="kw">return</span> final_answer(history)</pre>
+      </div>
+      <div style="align-self:center;font-weight:700;color:var(--violet);font-size:18px">wraps ▶</div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:700;font-size:18px">LangChain AgentExecutor:</div>
+<pre class="codeblock" style="flex:1">agent = <span class="fn">create_react_agent</span>(
+    llm=llm,
+    tools=TOOLS,
+    prompt=react_prompt)
+executor = <span class="fn">AgentExecutor</span>(
+    agent=agent, tools=TOOLS)</pre>
+      </div>
+    </div>
+    <div class="card" style="padding:14px 20px">
+      <div style="font-weight:700;font-size:18px;margin-bottom:8px">What AgentExecutor handles for you:</div>
+      <div class="row" style="gap:16px;font-size:17px;flex-wrap:wrap">
+        <span>✅ ReAct loop orchestration</span><span>✅ Output parsing &amp; validation</span><span>✅ Error recovery &amp; retries</span><span>✅ Max iteration guard</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 10b. SEQUENCE ===================== -->
+<section class="slide diagram" data-topic="Section 2 · Agents & Tools" data-title="Who Does What? LLM vs. Executor vs. Tool" id="s-seq">
+  <h2>Who Does What? LLM vs. Executor vs. Tool</h2>
+  <p class="sub">A sequence diagram of one AgentExecutor run. Only the executor runs code; the LLM only produces text.</p>
+  <div class="body" style="gap:10px;justify-content:flex-start;margin-top:10px">
+    <svg id="seqSvg" viewBox="0 0 1130 420" style="width:100%;height:425px"></svg>
+    <div class="row" style="align-items:center;gap:12px">
+      <button class="btn" id="seqPrev">◀ Back</button>
+      <button class="btn primary" id="seqNext">Next message ▶</button>
+      <button class="btn" id="seqAll">Show all</button>
+      <div class="panel grow" id="seqText" style="padding:9px 14px;font-size:16.5px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 11. STATELESS ===================== -->
+<section class="slide" data-topic="Section 3 · Memory" data-src="11" data-title="LLMs Are Stateless — The Problem">
+  <div class="kick">Section 3</div>
+  <h2>LLMs Are Stateless — The Problem</h2>
+  <p class="sub">Every API call is completely independent. No memory of previous messages.</p>
+  <div class="body">
+    <div class="chat" style="max-width:860px;align-self:center;width:100%">
+      <div class="callsep">.invoke() call #1</div>
+      <div class="msg h"><b>HUMAN</b>My name is Alice.</div>
+      <div class="msg ai"><b>AI</b>Nice to meet you, Alice!</div>
+      <div class="callsep">.invoke() call #2 — fresh start</div>
+      <div class="msg h"><b>HUMAN</b>What is my name?</div>
+      <div class="msg ai bad"><b>AI</b>I don't know your name. ❌ (forgot!)</div>
+    </div>
+    <div class="callout">Each <b>.invoke()</b> call is a fresh start — the model only sees what is in the current prompt.</div>
+  </div>
+</section>
+
+<!-- ===================== 12. MEMORY ===================== -->
+<section class="slide" data-topic="Section 3 · Memory" data-src="12" data-title="Memory — Making Agents Stateful">
+  <div class="kick">Section 3</div>
+  <h2>Memory — Making Agents Stateful</h2>
+  <p class="sub">The fix: inject the conversation history into every new prompt.</p>
+  <div class="body">
+    <div class="row" style="gap:30px">
+      <div class="card grow">
+        <h3 style="margin-top:0">How ConversationBufferMemory works</h3>
+        <div style="display:flex;flex-direction:column;gap:9px;font-size:18px;margin-top:10px">
+          <div>▸ 1. User sends a message</div><div>▸ 2. Buffer prepended to prompt</div><div>▸ 3. Full context sent to LLM</div><div>▸ 4. Response stored in buffer</div><div>▸ 5. Buffer grows each turn</div>
+        </div>
+      </div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:10px">
+        <h3 style="margin:0;font-size:24px">Memory Types</h3>
+        <div class="memtype used"><b>ConversationBufferMemory</b><span>Full history verbatim · Best for: short chats</span></div>
+        <div class="memtype"><b>ConversationSummaryMemory</b><span>LLM-summarizes history · Best for: long sessions</span></div>
+        <div class="memtype"><b>BufferWindowMemory</b><span>Last N turns only · Best for: fixed context</span></div>
+      </div>
+    </div>
+    <div class="callout" style="font-size:18px">In the notebook we use <b>ConversationBufferMemory</b> — most transparent for learning.</div>
+  </div>
+</section>
+
+<!-- ===================== 12b. MEMORY SIMULATOR ===================== -->
+<section class="slide diagram" data-topic="Section 3 · Memory" data-title="Memory Simulator" id="s-mem">
+  <h2>Memory Simulator</h2>
+  <p class="sub">Pick a memory type, then play the conversation. Watch what actually goes into the prompt.</p>
+  <div class="body" style="gap:12px;justify-content:flex-start;margin-top:12px">
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="tabs" id="memTabs"></div>
+      <span style="flex:1"></span>
+      <button class="btn" id="memReset">↺ Reset</button>
+      <button class="btn primary" id="memNext">Next turn ▶</button>
+    </div>
+    <div class="row" style="gap:22px;align-items:stretch">
+      <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">CONVERSATION</div>
+        <div class="chat panel" id="memChat" style="height:340px;overflow:auto;padding:12px"></div>
+      </div>
+      <div style="width:560px;display:flex;flex-direction:column;gap:6px">
+        <div class="note" style="font-weight:700;letter-spacing:.1em;font-size:13px">PROMPT SENT TO THE LLM THIS TURN</div>
+        <div class="prompt" id="memPrompt"></div>
+        <div class="ctrl" style="font-size:14px"><span style="width:120px">prompt size ≈ <b id="memTok">0</b> tokens</span><div class="meter grow"><i id="memMeter"></i></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 13. FULL PICTURE ===================== -->
+<section class="slide" data-topic="Wrap-up" data-src="13" data-title="The Full Picture">
+  <h2>The Full Picture</h2>
+  <p class="sub">All the pieces combined:</p>
+  <div class="body" style="gap:22px">
+    <div class="row" style="align-items:center;gap:14px">
+      <div class="fbox v" style="width:110px;font-size:18px">User<br>Input</div>
+      <div class="arr">→</div>
+      <div class="agbox grow">
+        <span class="lbl">LLM AGENT</span>
+        <div class="row" style="gap:14px;align-items:stretch">
+          <div class="fbox v" style="width:190px;display:flex;flex-direction:column;justify-content:center">🧠 Memory<span style="font-weight:400;font-size:14px;color:var(--slate)">Conversation History</span></div>
+          <div class="fbox ink grow" style="display:flex;flex-direction:column;justify-content:center;font-size:20px">LLM<span style="font-weight:400;font-size:14px;color:#C7D2FE">Reasoning Engine</span>
+            <span style="font-size:14px;color:var(--sky);margin-top:6px">↕ ReAct Loop ↕</span></div>
+          <div style="width:250px;display:flex;flex-direction:column;gap:6px;border:2px solid #FCD34D;border-radius:10px;padding:8px;background:#FFFDF5">
+            <div style="text-align:center;font-weight:700;color:var(--amber);font-size:14px;letter-spacing:.1em">TOOLS</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <span class="toolchip">calculator</span><span class="toolchip">capital_lookup</span><span class="toolchip">word_counter</span><span class="toolchip" style="border-style:dashed">+ custom</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="arr">→</div>
+      <div class="fbox" style="width:110px;font-size:18px;background:var(--green);color:#fff;border-color:var(--green)">Final<br>Answer</div>
+    </div>
+    <div class="row" style="gap:14px">
+      <div class="card grow" style="padding:14px 18px"><h3 style="margin:0 0 4px;font-size:20px">PromptTemplate</h3><p style="font-size:16px">Structures input</p></div>
+      <div class="card grow" style="padding:14px 18px"><h3 style="margin:0 0 4px;font-size:20px">ReAct Loop</h3><p style="font-size:16px">Reason → Act → Observe</p></div>
+      <div class="card grow" style="padding:14px 18px"><h3 style="margin:0 0 4px;font-size:20px">Tools</h3><p style="font-size:16px">Deterministic precision</p></div>
+      <div class="card grow" style="padding:14px 18px"><h3 style="margin:0 0 4px;font-size:20px">Memory</h3><p style="font-size:16px">Stateful conversations</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 14. NOTEBOOK AGENDA ===================== -->
+<section class="slide" data-topic="Notebook" data-src="14" data-title="Notebook Agenda — 40 Minutes">
+  <div class="kick">Let's build it</div>
+  <h2>Notebook Agenda — 40 Minutes</h2>
+  <div class="body" style="gap:14px">
+    <div class="agenda14">
+      <div class="r"><span class="tm">0:00–0:05</span><span class="emoji" style="font-size:28px">⚙️</span><div><b>Setup</b><span>Install packages, set your OpenAI API key, test the connection</span></div></div>
+      <div class="r"><span class="tm">0:05–0:15</span><span class="emoji" style="font-size:28px">📚</span><div><b>Section 1 — LLM Basics</b><span>PromptTemplate · LLMChain · Exercise 1</span></div></div>
+      <div class="r"><span class="tm">0:15–0:30</span><span class="emoji" style="font-size:28px">🔧</span><div><b>Section 2 — Agents &amp; Tools</b><span>Define tools · Manual ReAct loop · AgentExecutor · Exercise 2</span></div></div>
+      <div class="r"><span class="tm">0:30–0:40</span><span class="emoji" style="font-size:28px">🧠</span><div><b>Section 3 — Memory</b><span>ConversationBufferMemory · Stateful agent · Exercise 3</span></div></div>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="pill" style="background:var(--violet)">NOTEBOOKS</span><span>Workshop notebooks:</span>
+      <code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+    <div class="note" style="text-align:center;font-family:var(--mono)">
+      <a href="https://platform.openai.com" target="_blank" rel="noopener" style="color:var(--cyan)">platform.openai.com</a> &nbsp;·&nbsp;
+      <a href="https://python.langchain.com" target="_blank" rel="noopener" style="color:var(--cyan)">python.langchain.com</a> &nbsp;·&nbsp;
+      <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener" style="color:var(--cyan)">arxiv.org/abs/2210.03629</a>
+    </div>
+  </div>
+</section>
+
+</div></div>
+
+<div id="progress"></div>
+<nav id="menu" aria-label="Topics"></nav>
+<div id="nav">
+  <button id="bMenu" title="Topics (T)">☰ <span class="hide-sm">Topics</span></button>
+  <button id="bPrevT" class="hide-sm" title="Previous topic (↑)">⏮</button>
+  <div class="center">
+    <button id="bPrev" title="Previous slide (←)">◀ <span class="hide-sm">Prev</span></button>
+    <span id="topicLabel"></span>
+    <span id="counter"></span>
+    <button id="bNext" class="primary" title="Next slide (→)"><span class="hide-sm">Next</span> ▶</button>
+  </div>
+  <button id="bNextT" class="hide-sm" title="Next topic (↓)">⏭</button>
+  <button id="bFull" title="Fullscreen (F)">⛶</button>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = "http://www.w3.org/2000/svg";
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function S(tag, attrs = {}, parent, text) {
+  const el = document.createElementNS(NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  if (text != null) el.textContent = text;
+  if (parent) parent.appendChild(el);
+  return el;
+}
+function arrowDefs(svg, id, color) {
+  const defs = S("defs", {}, svg);
+  const m = S("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  S("path", { d: "M0 0L10 5L0 10z", fill: color }, m);
+}
+
+/* ============================== DECK NAV ============================== */
+const deck = $("#deck"), slides = $$(".slide");
+const topics = [];
+slides.forEach(s => {
+  const t = s.dataset.topic;
+  if (!topics.includes(t)) topics.push(t);
+  const f = document.createElement("div");
+  f.className = "foot";
+  f.textContent = s.dataset.src ? `PPTX slide ${s.dataset.src}` : "Additional diagram";
+  s.appendChild(f);
+  if (s.classList.contains("diagram")) {
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "INTERACTIVE DIAGRAM";
+    s.insertBefore(b, s.firstElementChild);
+  }
+});
+const firstOfTopic = t => slides.findIndex(s => s.dataset.topic === t);
+
+const menu = $("#menu");
+topics.forEach(t => {
+  const h = document.createElement("h5");
+  h.textContent = t; menu.appendChild(h);
+  slides.forEach((s, i) => {
+    if (s.dataset.topic !== t) return;
+    const a = document.createElement("a");
+    a.dataset.i = i;
+    a.innerHTML = `<i>${i + 1}</i><span></span>${s.classList.contains("diagram") ? "<em>DIAGRAM</em>" : ""}`;
+    a.querySelector("span").textContent = s.dataset.title;
+    a.onclick = () => { go(i); menu.classList.remove("open"); };
+    menu.appendChild(a);
+  });
+});
+
+const hooks = {};
+let cur = -1;
+function go(i) {
+  i = Math.max(0, Math.min(slides.length - 1, i));
+  if (i === cur) return;
+  slides.forEach((s, k) => s.classList.toggle("before", k < i));
+  if (cur >= 0) slides[cur].classList.remove("active");
+  const s = slides[i];
+  s.classList.add("active");
+  cur = i;
+  if (s.id && hooks[s.id]) hooks[s.id]();
+  $("#counter").textContent = `${i + 1} / ${slides.length}`;
+  $("#topicLabel").textContent = s.dataset.topic;
+  $("#progress").style.width = `${((i + 1) / slides.length) * 100}%`;
+  $("#bPrev").disabled = i === 0;
+  $("#bNext").disabled = i === slides.length - 1;
+  $$("#menu a").forEach(a => a.classList.toggle("cur", +a.dataset.i === i));
+  history.replaceState(null, "", "#" + (i + 1));
+}
+function topicStep(dir) {
+  const ti = topics.indexOf(slides[cur].dataset.topic);
+  if (dir < 0 && cur !== firstOfTopic(topics[ti])) return go(firstOfTopic(topics[ti]));
+  go(firstOfTopic(topics[Math.max(0, Math.min(topics.length - 1, ti + dir))]));
+}
+$("#bPrev").onclick = () => go(cur - 1);
+$("#bNext").onclick = () => go(cur + 1);
+$("#bPrevT").onclick = () => topicStep(-1);
+$("#bNextT").onclick = () => topicStep(1);
+$("#bMenu").onclick = () => menu.classList.toggle("open");
+$("#bFull").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+$$("[data-goto]").forEach(el => el.onclick = () => go(firstOfTopic(el.dataset.goto)));
+
+document.addEventListener("keydown", e => {
+  const t = e.target;
+  if ((t.tagName === "INPUT" && t.type !== "checkbox") || t.tagName === "TEXTAREA" || t.tagName === "SELECT") return;
+  switch (e.key) {
+    case "ArrowRight": case "PageDown": case " ": go(cur + 1); break;
+    case "ArrowLeft": case "PageUp": go(cur - 1); break;
+    case "ArrowDown": topicStep(1); break;
+    case "ArrowUp": topicStep(-1); break;
+    case "Home": go(0); break;
+    case "End": go(slides.length - 1); break;
+    case "t": case "T": menu.classList.toggle("open"); break;
+    case "f": case "F": $("#bFull").click(); break;
+    case "Escape": menu.classList.remove("open"); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+let tx = null;
+$("#viewport").addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, { passive: true });
+$("#viewport").addEventListener("touchend", e => {
+  if (tx == null) return;
+  const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 60) go(cur + (dx < 0 ? 1 : -1));
+});
+function fit() {
+  const vp = $("#viewport"), pad = 16;
+  const sc = Math.min((vp.clientWidth - pad * 2) / 1280, (vp.clientHeight - pad * 2) / 720);
+  deck.style.transform = `scale(${sc})`;
+  deck.style.left = (vp.clientWidth - 1280 * sc) / 2 + "px";
+  deck.style.top = (vp.clientHeight - 720 * sc) / 2 + "px";
+}
+window.addEventListener("resize", fit);
+
+/* ============================== NEXT-TOKEN ============================== */
+(() => {
+  const prompt = ["Translate", " to", " French", ":", " Hello", ",", " world", ".", "\n"];
+  const steps = [
+    [["Bon", 5.0], ["Salut", 3.2], ["Hello", 1.5], ["Allô", 0.8]],
+    [["jour", 6.0], ["soir", 2.2], ["ne", 1.0], ["heur", 0.3]],
+    [[",", 4.5], [" le", 3.0], [" tout", 1.2], ["!", 1.0]],
+    [[" le", 5.2], [" monde", 2.0], [" la", 1.4], [" à", 0.6]],
+    [[" monde", 6.5], [" globe", 2.0], [" planète", 1.5], [" Monde", 1.2]],
+    [[".", 5.0], ["!", 3.6], [" !", 1.0], ["<end>", 0.8]],
+    [["<end>", 6.0], ["\n", 2.5], [" Hello", 0.5], [" (", 0.4]]
+  ];
+  let n = 0;
+  const T = $("#tokT");
+  function render() {
+    const t = +T.value;
+    $("#tokTV").textContent = t.toFixed(1);
+    const out = steps.slice(0, n).map(s => s[0][0]).filter(x => x !== "<end>");
+    const vis = x => esc(x).replace(/\n/g, "↵");
+    $("#tokOut").innerHTML = prompt.map(p => `<span style="opacity:.6">${vis(p)}</span>`).join("") + "<br>" +
+      out.map((x, i) => `<span class="tk${i === out.length - 1 ? " new" : ""}">${vis(x)}</span>`).join("") +
+      (n < steps.length ? `<span style="opacity:.6"> ▌</span>` : `<span class="note" style="color:#6EE7B7"> ✓ &lt;end&gt; reached</span>`);
+    const st = steps[Math.min(n, steps.length - 1)];
+    const ex = st.map(([, l]) => Math.exp(l / t)), sum = ex.reduce((a, b) => a + b, 0);
+    $("#tokStep").textContent = n < steps.length ? `(step ${n + 1} of ${steps.length})` : "(done)";
+    $("#tokProbs").innerHTML = st.map(([tok, ], i) => {
+      const p = ex[i] / sum;
+      return `<div class="probrow${i === 0 ? " top" : ""}"><span class="code">"${vis(tok)}"</span><div class="bar"><i style="width:${(p * 100).toFixed(1)}%"></i></div><span class="v">${(p * 100).toFixed(1)}%</span></div>`;
+    }).join("");
+    $("#tokNext").disabled = n >= steps.length;
+  }
+  $("#tokNext").onclick = () => { n = Math.min(steps.length, n + 1); render(); };
+  $("#tokReset").onclick = () => { n = 0; render(); };
+  T.oninput = render;
+  hooks["s-tok"] = () => { n = 0; render(); };
+  render();
+})();
+
+/* ============================== TEMPLATE PLAYGROUND ============================== */
+(() => {
+  const ta = $("#tplText"), box = $("#tplVars");
+  const vals = { topic: "neural networks", audience: "high school student", n: "3" };
+  function vars() { const s = []; ta.value.replace(/\{(\w+)\}/g, (_, v) => { if (!s.includes(v)) s.push(v); }); return s; }
+  function build() {
+    const vs = vars();
+    $("#tplVarsList").textContent = JSON.stringify(vs);
+    box.innerHTML = "";
+    vs.forEach(v => {
+      const r = document.createElement("div"); r.className = "varrow";
+      r.innerHTML = `<label>{${esc(v)}}</label><input type="text">`;
+      const inp = r.querySelector("input"); inp.value = vals[v] ?? ""; inp.placeholder = "value for " + v;
+      inp.oninput = () => { vals[v] = inp.value; out(); };
+      box.appendChild(r);
+    });
+    if (!vs.length) box.innerHTML = `<p class="note" style="margin:0">No variables: add one with <code>{name}</code>.</p>`;
+    out();
+  }
+  function out() {
+    const vs = vars();
+    $("#tplOut").innerHTML = esc(ta.value).replace(/\{(\w+)\}/g, (_, v) => vals[v] ? `<mark>${esc(vals[v])}</mark>` : `<span class="miss">{${v}} missing!</span>`);
+    $("#tplCode").innerHTML = `prompt = <span class="fn">PromptTemplate</span>.from_template(\n    <span class="str">${esc(JSON.stringify(ta.value))}</span>)\nchain.<span class="fn">invoke</span>({${vs.map(v => `<span class="str">"${esc(v)}"</span>: <span class="str">${esc(JSON.stringify(vals[v] ?? ""))}</span>`).join(", ")}})`;
+  }
+  ta.oninput = build;
+  build();
+})();
+
+/* ============================== TOOL ANATOMY ============================== */
+(() => {
+  const tools = [
+    { name: "calculator", arg: "expression", desc: "Evaluate a Python math expression, e.g. 'math.sqrt(256)'.",
+      body: `    <span class="kw">return</span> str(eval(expression, {<span class="str">"math"</span>: math}))` },
+    { name: "capital_lookup", arg: "country", desc: "Return the capital city of a country.",
+      body: `    <span class="kw">return</span> CAPITALS.get(country.lower(), <span class="str">"Unknown"</span>)` },
+    { name: "word_counter", arg: "text", desc: "Count the number of words in a text.",
+      body: `    n = len(text.split())\n    <span class="kw">return</span> <span class="str">f"{n} words"</span>` }
+  ];
+  let sel = 1;
+  const tabs = $("#toolTabs");
+  tools.forEach((t, i) => { const b = document.createElement("button"); b.className = "btn"; b.textContent = t.name; b.onclick = () => { sel = i; render(); }; tabs.appendChild(b); });
+  const hl = (s, c) => `<span style="background:${c};color:#1E1B4B;border-radius:3px;padding:0 3px">${s}</span>`;
+  function render() {
+    const t = tools[sel];
+    [...tabs.children].forEach((b, i) => b.classList.toggle("sel", i === sel));
+    $("#toolCode").innerHTML = `<span class="dec">@tool</span>\n<span class="kw">def</span> ${hl(t.name, "#C4B5FD")}(${hl(t.arg + ": str", "#67E8F9")}) -> str:\n    ${hl(`"""${esc(t.desc)}"""`, "#FCD34D")}\n${t.body}`;
+    $("#toolObj").innerHTML = `
+      <div><span class="pill p-th">name</span><div class="code" style="margin-top:4px">"${t.name}"</div></div>
+      <div><span class="pill p-ob">description</span><div style="margin-top:4px">"${esc(t.desc)}"</div></div>
+      <div><span class="pill p-ac">args</span><div class="code" style="margin-top:4px">{"${t.arg}": {"type": "string"}}</div></div>`;
+    $("#toolPrompt").innerHTML = `Answer the following questions as best you can.\nYou have access to the following tools:\n\n` +
+      tools.map((x, i) => i === sel ? `${hl(x.name, "#C4B5FD")}: ${hl(esc(x.desc), "#FCD34D")}` : `<span style="opacity:.55">${x.name}: ${esc(x.desc)}</span>`).join("\n") +
+      `\n\nUse the following format:\nThought: ...\nAction: one of [${tools.map(x => x.name).join(", ")}]\nAction Input: ...\nObservation: ...`;
+  }
+  render();
+})();
+
+/* ============================== TRACE PLAYER ============================== */
+(() => {
+  const svg = $("#trSvg");
+  arrowDefs(svg, "tA", "#94A3B8");
+  const C = [200, 185], R = 120;
+  const nodes = { th: [C[0], C[1] - R, "Thought", "#6D28D9"], ac: [C[0] + R * .87, C[1] + R * .5, "Action", "#0891B2"], ob: [C[0] - R * .87, C[1] + R * .5, "Observation", "#D97706"] };
+  // loop arcs
+  const arcP = (a, b) => `M${a[0]} ${a[1]} A${R} ${R} 0 0 1 ${b[0]} ${b[1]}`;
+  const pt = deg => [C[0] + R * Math.cos(deg * Math.PI / 180), C[1] + R * Math.sin(deg * Math.PI / 180)];
+  S("path", { d: arcP(pt(-60), pt(5)), fill: "none", stroke: "#CBD5E1", "stroke-width": 4, "marker-end": "url(#tA)" }, svg);
+  S("path", { d: arcP(pt(60), pt(115)), fill: "none", stroke: "#CBD5E1", "stroke-width": 4, "marker-end": "url(#tA)" }, svg);
+  S("path", { d: arcP(pt(180), pt(240)), fill: "none", stroke: "#CBD5E1", "stroke-width": 4, "marker-end": "url(#tA)" }, svg);
+  // exit to final answer
+  S("path", { d: `M${C[0] + 50} ${C[1] - R + 4} C 380 60, 400 60, 400 120`, fill: "none", stroke: "#CBD5E1", "stroke-width": 3, "stroke-dasharray": "6 5", "marker-end": "url(#tA)" }, svg);
+  const fa = S("g", {}, svg);
+  S("rect", { x: 345, y: 124, width: 110, height: 48, rx: 10, fill: "#059669" }, fa);
+  S("text", { x: 400, y: 154, "text-anchor": "middle", fill: "#fff", "font-size": 15, "font-weight": 700 }, fa, "Final Answer");
+  // question in & center
+  const q = S("g", {}, svg);
+  S("circle", { cx: C[0], cy: C[1], r: 44, fill: "#1E1B4B" }, q);
+  S("text", { x: C[0], y: C[1] - 4, "text-anchor": "middle", fill: "#fff", "font-size": 14, "font-weight": 700 }, q, "AgentExecutor");
+  const loopT = S("text", { x: C[0], y: C[1] + 16, "text-anchor": "middle", fill: "#22D3EE", "font-size": 13 }, q, "");
+  const g = {};
+  for (const k in nodes) {
+    const [x, y, t, c] = nodes[k];
+    const grp = S("g", { style: "transition:opacity .3s" }, svg);
+    S("circle", { cx: x, cy: y, r: 42, fill: c, stroke: "#fff", "stroke-width": 4, class: "ring" }, grp);
+    S("text", { x, y: y + 5, "text-anchor": "middle", fill: "#fff", "font-size": t.length > 8 ? 13 : 15, "font-weight": 700 }, grp, t);
+    g[k] = grp;
+  }
+  S("text", { x: 20, y: 345, "font-size": 13, fill: "#64748B" }, svg, "Each Thought/Action = one LLM call · each Observation = one tool call");
+
+  const QN = "What is the capital of Japan and how many letters does its name have?";
+  const steps = [
+    { n: null, cls: "q", line: `Question: ${QN}`, ex: "The executor builds the first prompt: instructions + tool list + the question. The scratchpad is still empty." },
+    { n: "th", cls: "th", line: "Thought: I need to find Japan's capital. I'll use capital_lookup first.", ex: "<b>LLM call #1.</b> The model reasons about what it still needs." },
+    { n: "ac", cls: "ac", line: 'Action: capital_lookup\nAction Input: "japan"', ex: "Same LLM call: the model writes which tool to use and its input, then <b>stops generating</b>. It does not run anything." },
+    { n: "ob", cls: "ob", line: "Observation: Tokyo", ex: "<b>Tool call #1.</b> The executor parses the text, runs the Python function and appends the result to the scratchpad." },
+    { n: "th", cls: "th", line: 'Thought: Good. Now I need to count the letters in "Tokyo". I\'ll use word_counter.', ex: "<b>LLM call #2.</b> The whole scratchpad (including the observation) is sent again; the model continues the reasoning." },
+    { n: "ac", cls: "ac", line: 'Action: word_counter\nAction Input: "Tokyo"', ex: "The model picks the next tool." },
+    { n: "ob", cls: "ob", line: 'Observation: 1 word', ex: "<b>Tool call #2.</b> The tool counts words, not letters. The model must still reason about the letters itself." },
+    { n: "th", cls: "th", line: 'Thought: "Tokyo" is 1 word with 5 letters (T-o-k-y-o). I now know the final answer.', ex: "<b>LLM call #3.</b> Enough information gathered: the loop can stop." },
+    { n: "fa", cls: "fa", line: "Final Answer: The capital of Japan is Tokyo. It has 5 letters.", ex: "The executor detects <code>Final Answer:</code>, exits the loop and returns it to the user." }
+  ];
+  let st = 0;
+  function render() {
+    const s = steps[st];
+    for (const k in g) { g[k].style.opacity = s.n === k ? 1 : 0.3; g[k].querySelector(".ring").setAttribute("stroke", s.n === k ? "#FCD34D" : "#fff"); }
+    fa.style.opacity = s.n === "fa" ? 1 : 0.3;
+    const llm = steps.slice(1, st + 1).filter(x => x.n === "th").length;
+    const tools = steps.slice(1, st + 1).filter(x => x.n === "ob").length;
+    loopT.textContent = `LLM calls ${llm} · tools ${tools}`;
+    $("#trScratch").innerHTML = steps.slice(0, st + 1).map((x, i) => `<div class="${x.cls}${i === st ? " newline" : ""}">${esc(x.line)}</div>`).join("");
+    $("#trScratch").scrollTop = 1e6;
+    $("#trExplain").innerHTML = s.ex;
+    $("#trCount").textContent = `step ${st + 1} / ${steps.length}`;
+    $("#trPrev").disabled = st === 0;
+    $("#trNext").disabled = st === steps.length - 1;
+  }
+  $("#trNext").onclick = () => { st = Math.min(steps.length - 1, st + 1); render(); };
+  $("#trPrev").onclick = () => { st = Math.max(0, st - 1); render(); };
+  hooks["s-trace"] = () => { st = 0; render(); };
+  render();
+})();
+
+/* ============================== SEQUENCE DIAGRAM ============================== */
+(() => {
+  const svg = $("#seqSvg");
+  arrowDefs(svg, "sA", "#1E1B4B"); arrowDefs(svg, "sB", "#D97706");
+  const lanes = { U: [110, "User", "#64748B"], E: [430, "AgentExecutor", "#1E1B4B"], L: [760, "LLM (gpt-4o-mini)", "#6D28D9"], T: [1040, "Tool (Python)", "#0891B2"] };
+  for (const k in lanes) {
+    const [x, t, c] = lanes[k];
+    S("rect", { x: x - 85, y: 6, width: 170, height: 38, rx: 8, fill: c }, svg);
+    S("text", { x, y: 31, "text-anchor": "middle", fill: "#fff", "font-size": 16, "font-weight": 700 }, svg, t);
+    S("line", { x1: x, y1: 44, x2: x, y2: 415, stroke: "#CBD5E1", "stroke-width": 2, "stroke-dasharray": "5 5" }, svg);
+  }
+  const msgs = [
+    ["U", "E", 'invoke({"input": question})', "The user calls executor.invoke() with the question."],
+    ["E", "L", "prompt: instructions + tools + question + scratchpad", "The executor formats the ReAct prompt and makes LLM call #1."],
+    ["L", "E", 'text: "Thought… Action: capital_lookup  Action Input: japan"', "The LLM returns plain TEXT describing the tool it wants. It cannot execute anything."],
+    ["E", "E", "parse output → (tool, input)", "The output parser extracts the tool name and input. If parsing fails, the executor can send the error back to the LLM and retry."],
+    ["E", "T", 'capital_lookup("japan")', "The executor runs the real Python function."],
+    ["T", "E", '"Tokyo"', "The tool result is appended to the scratchpad as an Observation."],
+    ["E", "L", "prompt + Observation: Tokyo", "LLM call #2 with the updated scratchpad (the loop repeats; max_iterations stops runaway loops)."],
+    ["L", "E", 'text: "… Final Answer: The capital of Japan is Tokyo…"', "The model decides it has enough information and writes the Final Answer."],
+    ["E", "U", '{"output": "The capital of Japan is Tokyo. It has 5 letters."}', "The executor detects the final answer, stops the loop and returns the output."]
+  ];
+  const y0 = 78, dy = 38;
+  const els = msgs.map(([a, b, label], i) => {
+    const grp = S("g", { style: "transition:opacity .3s" }, svg);
+    const y = y0 + i * dy, xa = lanes[a][0], xb = lanes[b][0];
+    S("text", { x: 14, y: y + 5, "font-size": 13, fill: "#94A3B8", "font-family": "Consolas, monospace" }, grp, i + 1);
+    const tool = a === "T" || b === "T";
+    const col = tool ? "#D97706" : "#1E1B4B";
+    if (a === b) {
+      S("path", { d: `M${xa} ${y - 8} h60 v16 h-58`, fill: "none", stroke: col, "stroke-width": 2, "marker-end": "url(#sA)" }, grp);
+      S("text", { x: xa + 70, y: y + 5, "font-size": 14.5, fill: col }, grp, label);
+    } else {
+      S("line", { x1: xa, y1: y, x2: xb + (xb > xa ? -4 : 4), y2: y, stroke: col, "stroke-width": 2.2, "marker-end": tool ? "url(#sB)" : "url(#sA)", "stroke-dasharray": b === "E" && a !== "U" ? "7 4" : "" }, grp);
+      const mx = (xa + xb) / 2;
+      const tx = S("text", { x: mx, y: y - 7, "text-anchor": "middle", "font-size": 14, fill: col, "font-family": "Consolas, monospace" }, grp, label);
+      if (label.length > 46 && Math.abs(xb - xa) < 400) tx.setAttribute("font-size", 12);
+    }
+    return grp;
+  });
+  let st = 0;
+  function render() {
+    els.forEach((e, i) => { e.style.opacity = st === 0 || i < st ? 1 : 0.08; e.style.fontWeight = i === st - 1 ? 700 : 400; });
+    $("#seqText").innerHTML = st === 0 ? "<b>Overview.</b> Solid arrows are requests, dashed arrows are replies. Press <b>Next message ▶</b> to replay the run." : `<b>${st}/${msgs.length}.</b> ${msgs[st - 1][3]}`;
+    $("#seqPrev").disabled = st === 0;
+    $("#seqNext").disabled = st === msgs.length;
+  }
+  $("#seqNext").onclick = () => { st = Math.min(msgs.length, st + 1); render(); };
+  $("#seqPrev").onclick = () => { st = Math.max(0, st - 1); render(); };
+  $("#seqAll").onclick = () => { st = 0; render(); };
+  hooks["s-seq"] = () => { st = 0; render(); };
+  render();
+})();
+
+/* ============================== MEMORY SIMULATOR ============================== */
+(() => {
+  const turns = [
+    ["My name is Alice.", "Nice to meet you, Alice!"],
+    ["I'm learning about LLM agents.", "Great topic! Agents combine an LLM with tools and a reasoning loop."],
+    ["Which pattern do most agents use?", "Most use the ReAct pattern: Thought → Action → Observation."],
+    ["What is my name?", null]
+  ];
+  const types = {
+    none: { label: "No memory", ans: "I don't know your name. ❌" },
+    buffer: { label: "ConversationBufferMemory", ans: "Your name is Alice. ✅" },
+    window: { label: "BufferWindowMemory (k=2)", ans: "I don't know your name. ❌ (the turn with your name fell out of the window)" },
+    summary: { label: "ConversationSummaryMemory", ans: "Your name is Alice. ✅" }
+  };
+  const summaries = [
+    "",
+    "The user introduced themselves as Alice.",
+    "Alice is learning about LLM agents; the AI explained they combine an LLM, tools and a reasoning loop.",
+    "Alice is learning about LLM agents; the AI explained agents and the ReAct pattern (Thought → Action → Observation)."
+  ];
+  let type = "buffer", n = 0;
+  const tabs = $("#memTabs");
+  for (const k in types) { const b = document.createElement("button"); b.className = "btn"; b.dataset.k = k; b.textContent = types[k].label; b.onclick = () => { type = k; render(); }; tabs.appendChild(b); }
+  const answer = i => turns[i][1] ?? types[type].ans;
+  function render() {
+    [...tabs.children].forEach(b => b.classList.toggle("sel", b.dataset.k === type));
+    const chat = $("#memChat");
+    chat.innerHTML = "";
+    for (let i = 0; i < n; i++) {
+      chat.insertAdjacentHTML("beforeend", `<div class="callsep">turn ${i + 1}</div><div class="msg h"><b>HUMAN</b>${esc(turns[i][0])}</div>` +
+        `<div class="msg ai${turns[i][1] ? "" : answer(i).includes("✅") ? " good" : " bad"}"><b>AI</b>${esc(answer(i))}</div>`);
+    }
+    if (!n) chat.innerHTML = `<p class="note" style="margin:auto;text-align:center">Press <b>Next turn ▶</b> to start the conversation.</p>`;
+    chat.scrollTop = 1e6;
+    // prompt for the latest turn
+    let p = "";
+    if (n) {
+      const i = n - 1;
+      p = `<span class="sys">System: You are a helpful assistant.</span>\n\n`;
+      if (type === "buffer" || type === "window") {
+        const from = type === "window" ? Math.max(0, i - 2) : 0;
+        const hist = turns.slice(from, i).map((t, k) => `Human: ${esc(t[0])}\nAI: ${esc(answer(from + k))}`).join("\n");
+        p += hist ? `<span class="hist">${hist}</span>\n` : `<span class="sys">(history empty)</span>\n`;
+        if (type === "window" && from > 0) p = p.replace("\n\n", `\n\n<span class="sys">[${from} older turn(s) dropped]</span>\n`);
+      } else if (type === "summary") {
+        p += summaries[i] ? `<span class="sum">Summary of conversation: ${esc(summaries[i])}</span>\n` : `<span class="sys">(no summary yet)</span>\n`;
+      } else {
+        p += `<span class="sys">(no history: every call starts fresh)</span>\n`;
+      }
+      p += `<span class="cur">Human: ${esc(turns[i][0])}\nAI:</span>`;
+    } else p = `<span class="sys">The prompt for each turn will appear here.</span>`;
+    $("#memPrompt").innerHTML = p;
+    const tok = Math.round($("#memPrompt").textContent.length / 4);
+    $("#memTok").textContent = n ? tok : 0;
+    $("#memMeter").style.width = Math.min(100, n ? tok / 1.6 : 0) + "%";
+    $("#memNext").disabled = n >= turns.length;
+  }
+  $("#memNext").onclick = () => { n = Math.min(turns.length, n + 1); render(); };
+  $("#memReset").onclick = () => { n = 0; render(); };
+  hooks["s-mem"] = () => render();
+  render();
+})();
+
+/* ============================== START ============================== */
+fit();
+const h = parseInt(location.hash.slice(1), 10);
+go(Number.isFinite(h) ? h - 1 : 0);
+})();
+</script>
+</body>
+</html>

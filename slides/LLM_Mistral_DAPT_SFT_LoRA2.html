@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrenando LLMs: Mistral, DAPT, SFT, LoRA</title>
+<style>
+:root{
+  --bg:#0D1117; --card:#161B27; --edge:#1E2636; --text:#B0BECC; --muted:#556677; --white:#FFFFFF;
+  --teal:#00D4AA; --blue:#4A9EFF; --orange:#FF8C42; --purple:#AA77FF; --red:#FF5C6C;
+  --sans: "Segoe UI", Calibri, "Helvetica Neue", Arial, sans-serif;
+  --mono: Consolas, "Cascadia Mono", Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#05070b;font-family:var(--sans);overflow:hidden}
+button,select,input{font-family:inherit}
+
+#viewport{position:fixed;left:0;right:0;top:0;bottom:56px;overflow:hidden}
+#deck{position:absolute;width:1280px;height:720px;transform-origin:0 0;background:var(--bg);box-shadow:0 20px 60px rgba(0,0,0,.6);border-radius:6px;overflow:hidden;border:1px solid var(--edge)}
+.slide{position:absolute;inset:0;padding:38px 60px 42px 72px;background:var(--bg);color:var(--text);display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateX(30px);transition:opacity .35s ease, transform .35s ease, visibility 0s linear .35s}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .35s ease, transform .35s ease}
+.slide.before{transform:translateX(-30px)}
+.slide::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:linear-gradient(var(--teal),var(--blue),var(--purple))}
+.slide h2{font-size:38px;font-weight:700;margin:0;color:var(--white);line-height:1.12}
+.slide .sub{color:var(--teal);font-size:19px;margin:8px 0 0;line-height:1.4}
+.slide .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-top:14px;min-height:0}
+.foot{position:absolute;right:24px;bottom:14px;font-size:12px;color:var(--muted);letter-spacing:.04em}
+.badge{display:inline-block;align-self:flex-start;background:var(--orange);color:#111;font-size:12px;font-weight:700;letter-spacing:.12em;padding:3px 10px;border-radius:4px;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:16px 20px}
+.card h3{font-size:20px;margin:0 0 8px;color:var(--white)}
+.card p{margin:0;font-size:16.5px;line-height:1.45}
+.card.t{border-top:3px solid var(--teal)} .card.b{border-top:3px solid var(--blue)} .card.o{border-top:3px solid var(--orange)} .card.p{border-top:3px solid var(--purple)}
+.c-t{color:var(--teal)} .c-b{color:var(--blue)} .c-o{color:var(--orange)} .c-p{color:var(--purple)} .c-w{color:var(--white)} .c-r{color:var(--red)}
+.callout{background:linear-gradient(90deg,rgba(0,212,170,.12),rgba(74,158,255,.06));border:1px solid rgba(0,212,170,.35);border-left:5px solid var(--teal);padding:12px 20px;border-radius:8px;font-size:18px;color:var(--white);line-height:1.4}
+.note{font-size:15px;color:var(--muted);line-height:1.45}
+.row{display:flex;gap:18px}
+.grow{flex:1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+code,.code{font-family:var(--mono)}
+pre.codeblock{margin:0;background:#0A0E14;border:1px solid var(--edge);color:#D6DEE8;border-radius:10px;padding:14px 18px;font-size:15.5px;line-height:1.55;font-family:var(--mono);white-space:pre;overflow:auto}
+.kw{color:var(--purple)} .str{color:#FFD580} .fn{color:var(--blue)} .cm{color:var(--muted)} .nu{color:var(--orange)}
+.btn{border:1px solid var(--teal);background:transparent;color:var(--teal);padding:6px 14px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.btn:hover:not(:disabled){background:rgba(0,212,170,.12)}
+.btn.sel{background:var(--teal);color:#0D1117}
+.btn:disabled{opacity:.4;cursor:default}
+.ctrl{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text)}
+input[type=range]{accent-color:var(--teal);width:200px}
+input[type=checkbox]{accent-color:var(--teal);width:17px;height:17px}
+svg text{font-family:var(--sans)}
+.flow{display:flex;align-items:stretch;gap:8px}
+.fbox{flex:1;background:var(--card);border:1.5px solid var(--edge);border-radius:10px;padding:12px 10px;text-align:center;font-size:16px;color:var(--white);font-weight:600;line-height:1.3}
+.fbox small{display:block;font-weight:400;color:var(--text);font-size:13.5px;margin-top:4px;line-height:1.35}
+.fbox.t{border-color:var(--teal)} .fbox.b{border-color:var(--blue)} .fbox.o{border-color:var(--orange)} .fbox.p{border-color:var(--purple)}
+.fbox.dim{opacity:.45;border-style:dashed}
+.fa{display:grid;place-items:center;color:var(--teal);font-size:24px;font-weight:700}
+table.t{border-collapse:collapse;width:100%;font-size:16.5px}
+table.t th{background:#0A0E14;color:var(--white);text-align:left;padding:10px 12px;font-weight:600;border-bottom:2px solid var(--teal)}
+table.t td{padding:9px 12px;border-bottom:1px solid var(--edge)}
+table.t tr:hover td{background:rgba(255,255,255,.02)}
+table.t td:first-child{color:var(--white);font-weight:600}
+ul.b{margin:0;padding-left:20px;line-height:1.65;font-size:17px}
+.num{font-family:var(--mono);font-weight:700;font-size:22px}
+.repo{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--white);background:var(--card);border:2px solid var(--teal);border-radius:10px;padding:11px 18px;font-size:17px;font-weight:600;transition:background .15s}
+.repo:hover{background:#1c2434}
+.repo code{color:var(--teal);font-size:16px;font-weight:400}
+.pill{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.1em;padding:3px 9px;border-radius:4px;color:#0D1117;background:var(--teal)}
+
+/* title */
+.title-slide{justify-content:center;background:radial-gradient(900px 500px at 80% 30%, rgba(74,158,255,.18), transparent 60%), radial-gradient(700px 400px at 10% 90%, rgba(0,212,170,.12), transparent 60%), var(--bg)}
+.title-slide h1{font-size:62px;color:var(--white);margin:0 0 16px;line-height:1.08;max-width:760px}
+.title-slide .tags{display:flex;gap:12px;margin-top:30px}
+.title-slide .tags span{font-family:var(--mono);font-weight:700;font-size:20px;padding:10px 18px;border-radius:8px;border:2px solid}
+
+/* agenda */
+.agenda{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.agenda .it{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:12px;background:var(--card);border:1px solid var(--edge);border-radius:10px;padding:13px 18px;cursor:pointer;transition:border-color .15s, transform .15s}
+.agenda .it:hover{border-color:var(--teal);transform:translateX(4px)}
+.agenda .it span:last-child{font-family:var(--mono);color:var(--orange);font-size:15px}
+.agenda .it b{color:var(--white);font-size:18px;font-weight:600}
+
+/* diagrams */
+.panel{background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:14px 18px}
+.panel h4{margin:0 0 8px;color:var(--white);font-size:18px}
+.big{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--white)}
+.kv{display:flex;justify-content:space-between;font-size:16px;padding:4px 0;border-bottom:1px dashed var(--edge)}
+.kv b{font-family:var(--mono);color:var(--white)}
+.bar{height:16px;background:#0A0E14;border-radius:8px;overflow:hidden;border:1px solid var(--edge)}
+.bar i{display:block;height:100%;transition:width .3s}
+.tok{display:inline-flex;flex-direction:column;align-items:center;margin:3px 2px;font-family:var(--mono);font-size:15px}
+.tok span{padding:3px 6px;border-radius:5px;border:1.5px solid var(--edge);background:#0A0E14;color:var(--white);white-space:pre}
+.tok em{font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.tok.on span{border-color:var(--teal);background:rgba(0,212,170,.15)}
+.tok.on em{color:var(--teal)}
+.tok.off span{opacity:.4;text-decoration:line-through;text-decoration-color:rgba(255,92,108,.6)}
+.tok.off em{color:var(--red)}
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mods label{display:flex;gap:8px;align-items:center;background:#0A0E14;border:1px solid var(--edge);border-radius:8px;padding:7px 10px;font-family:var(--mono);font-size:14.5px;cursor:pointer}
+table.m{border-collapse:collapse;width:100%;font-size:15px;font-family:var(--mono)}
+table.m th{color:var(--muted);text-align:right;padding:5px 8px;font-weight:600;font-family:var(--sans)}
+table.m td{text-align:right;padding:5px 8px;border-top:1px solid var(--edge)}
+table.m td:first-child,table.m th:first-child{text-align:left}
+table.m tr.off td{opacity:.3}
+.legend{display:flex;gap:16px;font-size:14px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* nav */
+#nav{position:fixed;left:0;right:0;bottom:0;height:56px;background:#080b10;border-top:1px solid var(--edge);display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--text);z-index:5}
+#nav button{background:var(--card);color:#E2E8F0;border:1px solid #2a3448;border-radius:8px;height:38px;min-width:42px;padding:0 12px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:6px}
+#nav button:hover:not(:disabled){border-color:var(--teal)}
+#nav button:disabled{opacity:.35;cursor:default}
+#nav .primary{background:var(--teal);color:#0D1117;border-color:var(--teal);font-weight:700}
+#nav .center{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-width:0}
+#topicLabel{font-size:15px;color:var(--teal);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#counter{font-family:var(--mono);font-size:14px;color:var(--muted);white-space:nowrap}
+#progress{position:fixed;left:0;bottom:56px;height:3px;background:var(--teal);transition:width .3s;z-index:6}
+#menu{position:fixed;left:0;top:0;bottom:56px;width:360px;max-width:90vw;background:#080b10;border-right:1px solid var(--edge);color:#E2E8F0;transform:translateX(-100%);transition:transform .25s;z-index:7;overflow:auto;padding:16px 0}
+#menu.open{transform:none}
+#menu h5{margin:14px 18px 4px;font-size:12px;letter-spacing:.14em;color:var(--teal);text-transform:uppercase}
+#menu a{display:flex;gap:10px;padding:6px 18px 6px 26px;font-size:14.5px;color:var(--text);cursor:pointer}
+#menu a:hover{background:var(--card)}
+#menu a.cur{background:#1c2434;color:#fff;border-left:3px solid var(--teal);padding-left:23px}
+#menu a i{font-style:normal;font-family:var(--mono);color:var(--muted);width:22px;flex:none}
+#menu a em{font-style:normal;font-size:11px;background:var(--orange);color:#111;border-radius:3px;padding:0 5px;margin-left:auto;align-self:center;font-weight:700}
+@media (max-width:640px){ #nav .hide-sm{display:none} #topicLabel{display:none} }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="deck">
+
+<!-- ===================== 1. TÍTULO ===================== -->
+<section class="slide title-slide" data-topic="Introducción" data-src="1" data-title="Entrenando Grandes Modelos de Lenguaje">
+  <div class="pill" style="align-self:flex-start;margin-bottom:18px">PLÁTICA DE DIVULGACIÓN TÉCNICA · ~30 MIN</div>
+  <h1>Entrenando Grandes Modelos de Lenguaje</h1>
+  <div style="font-size:24px;color:var(--teal)">Mistral · Domain-Adaptive Pretraining · SFT · LoRA / PEFT</div>
+  <div style="font-size:18px;margin-top:10px">Alumnos de Ingeniería · Penúltimo año</div>
+  <div class="tags">
+    <span style="color:var(--blue);border-color:var(--blue)">LLM</span>
+    <span style="color:var(--teal);border-color:var(--teal)">DAPT</span>
+    <span style="color:var(--orange);border-color:var(--orange)">SFT</span>
+    <span style="color:var(--purple);border-color:var(--purple)">LoRA</span>
+  </div>
+  <svg viewBox="0 0 360 360" style="position:absolute;right:60px;top:170px;width:360px;opacity:.9" aria-hidden="true">
+    <g fill="none" stroke-width="2">
+      <rect x="40" y="60" width="180" height="180" rx="10" stroke="#4A9EFF"/>
+      <text x="130" y="158" text-anchor="middle" fill="#4A9EFF" font-size="34" font-family="Consolas,monospace" font-weight="700">W₀</text>
+      <text x="130" y="186" text-anchor="middle" fill="#556677" font-size="14">congelado ❄</text>
+      <rect x="240" y="60" width="26" height="180" rx="4" stroke="#00D4AA" fill="rgba(0,212,170,.15)"/>
+      <text x="253" y="258" text-anchor="middle" fill="#00D4AA" font-size="18" font-family="Consolas,monospace" font-weight="700">B</text>
+      <rect x="280" y="60" width="70" height="26" rx="4" stroke="#AA77FF" fill="rgba(170,119,255,.15)" transform="translate(-10 200)"/>
+      <text x="305" y="306" text-anchor="middle" fill="#AA77FF" font-size="18" font-family="Consolas,monospace" font-weight="700">A</text>
+    </g>
+    <text x="226" y="160" fill="#B0BECC" font-size="28">+</text>
+  </svg>
+</section>
+
+<!-- ===================== 2. AGENDA ===================== -->
+<section class="slide" data-topic="Introducción" data-src="2" data-title="Agenda">
+  <h2>Agenda</h2>
+  <p class="sub">Haz clic en un tema para ir directamente</p>
+  <div class="body" style="gap:16px">
+    <div class="agenda">
+      <div class="it" data-goto="01 · ¿Qué es un LLM?"><span class="num c-b">01</span><b>¿Qué es un LLM? Contexto y motivación</b><span>2 min</span></div>
+      <div class="it" data-goto="02 · Mistral"><span class="num c-t">02</span><b>Mistral: Arquitectura y decisiones de diseño</b><span>6 min</span></div>
+      <div class="it" data-goto="03 · DAPT"><span class="num c-o">03</span><b>Domain-Adaptive Pretraining (DAPT)</b><span>6 min</span></div>
+      <div class="it" data-goto="04 · SFT"><span class="num c-p">04</span><b>Supervised Fine-Tuning (SFT) con instrucciones</b><span>8 min</span></div>
+      <div class="it" data-goto="05 · PEFT y LoRA"><span class="num c-t">05</span><b>PEFT y LoRA: Fine-tuning eficiente</b><span>6 min</span></div>
+      <div class="it" data-goto="06 · Recapitulación"><span class="num c-b">06</span><b>Recapitulación y preguntas</b><span>2 min</span></div>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="pill">NOTEBOOKS</span><span>Repositorio del taller:</span><code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+  </div>
+</section>
+
+<!-- ===================== 3. QUÉ ES UN LLM ===================== -->
+<section class="slide" data-topic="01 · ¿Qué es un LLM?" data-src="3" data-title="¿Qué es un Large Language Model?">
+  <h2>¿Qué es un Large Language Model?</h2>
+  <div class="body">
+    <p style="font-size:20px;line-height:1.5;margin:0;color:var(--white)">Un LLM es una red neuronal (<span class="c-b">Transformer</span>) entrenada en cantidades masivas de texto para <span class="c-t">predecir el token siguiente</span>. Al hacerlo a escala, emerge la capacidad de razonar, resumir, traducir y generar código.</p>
+    <div class="flow" style="max-width:820px;align-self:center;width:100%">
+      <div class="fbox">"El paciente presenta fiebre y"</div><div class="fa">→</div>
+      <div class="fbox b">Transformer<small>self-attention × N capas</small></div><div class="fa">→</div>
+      <div class="fbox t">P(token siguiente)<small>" tos" 0.31 · " dolor" 0.22 · " malestar" 0.12 …</small></div>
+    </div>
+    <div class="g3">
+      <div class="card b"><h3>Transformer</h3><p>Arquitectura basada en mecanismo de atención (self-attention). Encoder-Decoder o solo Decoder.</p></div>
+      <div class="card t"><h3>Tokens</h3><p>Unidades de texto sub-palabra. GPT-4 usa ~100 k tokens. Los LLMs predicen distribuciones sobre tokens.</p></div>
+      <div class="card o"><h3>Escala</h3><p>Ley de escalado: más parámetros + más datos + más cómputo → mejor perplejidad y capacidades emergentes.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 4. PIPELINE ===================== -->
+<section class="slide" data-topic="01 · ¿Qué es un LLM?" data-src="4" data-title="Pipeline de Entrenamiento de un LLM">
+  <h2>Pipeline de Entrenamiento de un LLM</h2>
+  <div class="body" style="gap:26px">
+    <div class="flow">
+      <div class="fbox b" style="padding:18px 12px"><span class="c-b" style="font-size:20px">1. Pretraining</span><small>Datos web a escala (TB).<br>Objetivo: predecir token siguiente.</small></div><div class="fa">→</div>
+      <div class="fbox t" style="padding:18px 12px"><span class="c-t" style="font-size:20px">2. DAPT</span><small>Corpus de dominio.<br>Adaptar el modelo al vocabulario del área.</small></div><div class="fa">→</div>
+      <div class="fbox o" style="padding:18px 12px"><span class="c-o" style="font-size:20px">3. SFT</span><small>Pares instrucción-respuesta.<br>Aprender a seguir indicaciones.</small></div><div class="fa">→</div>
+      <div class="fbox p dim" style="padding:18px 12px"><span class="c-p" style="font-size:20px">4. RLHF / DPO</span><small>(opcional)<br>Preferencias humanas. Alinear tono y seguridad.</small></div>
+    </div>
+    <div>
+      <div class="note" style="margin-bottom:6px">Volumen de datos por etapa (cualitativo, escala no lineal)</div>
+      <div class="flow" style="align-items:center">
+        <div style="flex:1"><div class="bar" style="height:18px"><i style="width:100%;background:#4A9EFF"></i></div><div class="note" style="margin-top:4px">TB de texto web</div></div><div style="width:30px"></div>
+        <div style="flex:1"><div class="bar" style="height:18px"><i style="width:45%;background:#00D4AA"></i></div><div class="note" style="margin-top:4px">GB de texto del dominio</div></div><div style="width:30px"></div>
+        <div style="flex:1"><div class="bar" style="height:18px"><i style="width:15%;background:#FF8C42"></i></div><div class="note" style="margin-top:4px">1 K–100 K pares</div></div><div style="width:30px"></div>
+        <div style="flex:1"><div class="bar" style="height:18px"><i style="width:10%;background:#AA77FF;opacity:.6"></i></div><div class="note" style="margin-top:4px">pares de preferencias</div></div>
+      </div>
+    </div>
+    <div class="callout">★ Esta plática cubre las etapas <b class="c-t">1 → 3</b>, con foco en eficiencia vía <b class="c-p">LoRA</b>.</div>
+  </div>
+</section>
+
+<!-- ===================== 5. MISTRAL 7B ===================== -->
+<section class="slide" data-topic="02 · Mistral" data-src="5" data-title="Mistral 7B — El modelo base">
+  <h2>Mistral 7B — El modelo que usaremos de base</h2>
+  <div class="body">
+    <div class="row" style="gap:24px">
+      <div class="grow" style="display:flex;flex-direction:column;gap:16px">
+        <ul class="b">
+          <li><b class="c-w">7 mil millones de parámetros</b> · Lanzado oct 2023 (Mistral AI, Francia)</li>
+          <li>Licencia <b class="c-t">Apache 2.0</b> → libre para uso comercial y académico</li>
+          <li>Supera a LLaMA-2 13B en la mayoría de benchmarks con la mitad de parámetros</li>
+          <li>Contexto de <b class="c-w">8 192 tokens</b> en versión base</li>
+          <li>Base para fine-tuning eficiente con LoRA / QLoRA</li>
+        </ul>
+        <div class="card t">
+          <h3 class="c-t">¿Por qué Mistral?</h3>
+          <p>✓ Pequeño pero capaz → cabe en 1 GPU consumer<br>✓ Open-source y reproducible<br>✓ Arquitectura moderna y bien documentada<br>✓ Ecosistema activo (HuggingFace, vLLM, Ollama)</p>
+        </div>
+      </div>
+      <div style="width:400px;display:flex;flex-direction:column;gap:10px">
+        <h3 style="margin:0;color:var(--white);font-size:19px">Versiones del ecosistema Mistral</h3>
+        <div class="card b" style="padding:12px 16px"><h3 style="font-size:17px;margin-bottom:2px">Mistral 7B</h3><p style="font-size:15px">Modelo base de lenguaje</p></div>
+        <div class="card t" style="padding:12px 16px"><h3 style="font-size:17px;margin-bottom:2px">Mistral 7B Instruct</h3><p style="font-size:15px">Fine-tuned con SFT para seguir instrucciones</p></div>
+        <div class="card o" style="padding:12px 16px"><h3 style="font-size:17px;margin-bottom:2px">Mixtral 8×7B</h3><p style="font-size:15px">Mixture of Experts — 8 expertos, 2 activos por token</p></div>
+        <div class="card p" style="padding:12px 16px"><h3 style="font-size:17px;margin-bottom:2px">Mistral Large / Small</h3><p style="font-size:15px">Modelos propietarios de mayor escala</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6. INNOVACIONES ===================== -->
+<section class="slide" data-topic="02 · Mistral" data-src="6" data-title="Mistral 7B — Innovaciones Arquitectónicas">
+  <h2>Mistral 7B — Innovaciones Arquitectónicas</h2>
+  <div class="body">
+    <div class="g2">
+      <div class="card b"><h3 class="c-b">Grouped-Query Attention (GQA)</h3><p>En Multi-Head Attention clásica cada cabeza Q tiene su propia K y V. GQA agrupa varias cabezas Q para compartir K y V → reduce memoria KV-cache en inferencia sin degradar calidad.</p></div>
+      <div class="card t"><h3 class="c-t">Sliding Window Attention (SWA)</h3><p>Cada token solo atiende a los W tokens anteriores (W=4096). Complejidad O(n·W) en vez de O(n²). El flujo de información a larga distancia se propaga a través de capas apiladas.</p></div>
+      <div class="card o"><h3 class="c-o">RoPE — Rotary Position Embedding</h3><p>Codifica posición relativa rotando vectores Q y K en el espacio complejo. Permite extrapolar a contextos más largos que los vistos en entrenamiento.</p></div>
+      <div class="card p"><h3 class="c-p">SwiGLU Activation</h3><p>Función de activación en la MLP: <code>SwiGLU(x) = Swish(xW) ⊙ (xV)</code>. Mejora empíricamente la perplejidad sin costo significativo de cómputo.</p></div>
+    </div>
+    <p class="note" style="margin:0">Las dos siguientes diapositivas exploran GQA y SWA de forma interactiva.</p>
+  </div>
+</section>
+
+<!-- ===================== 6b. GQA ===================== -->
+<section class="slide diagram" data-topic="02 · Mistral" data-title="MHA vs. GQA vs. MQA">
+  <h2>MHA vs. GQA vs. MQA: ¿quién comparte K y V?</h2>
+  <p class="sub">Cada línea une una cabeza de consulta (Q) con la cabeza K/V que usa. Menos cabezas K/V → KV-cache más pequeño.</p>
+  <div class="body" style="flex-direction:row;gap:22px;align-items:stretch;margin-top:14px">
+    <div style="width:640px;flex:none;display:flex;flex-direction:column;gap:12px">
+      <div class="row" style="gap:8px" id="gqaBtns"></div>
+      <svg id="gqaSvg" viewBox="0 0 640 330" style="width:100%"></svg>
+      <p class="note" style="margin:0">Dibujo simplificado a 8 cabezas Q. Mistral 7B real: <b class="c-w">32 cabezas Q</b> y <b class="c-w">8 cabezas K/V</b> (grupos de 4).</p>
+    </div>
+    <div class="grow panel" style="display:flex;flex-direction:column;gap:12px">
+      <h4>Memoria del KV-cache (configuración real de Mistral 7B)</h4>
+      <div class="note" style="font-family:var(--mono);font-size:13.5px;color:var(--text)">bytes/token = 2 (K y V) × 32 capas × n_kv × 128 (head_dim) × 2 bytes (fp16)</div>
+      <div class="kv"><span>Cabezas K/V (n_kv)</span><b id="gqaN"></b></div>
+      <div class="kv"><span>KV-cache por token</span><b id="gqaPer"></b></div>
+      <label class="ctrl">Contexto <input type="range" id="gqaCtx" min="1" max="32" value="8"> <b class="code" id="gqaCtxV"></b></label>
+      <div class="kv"><span>KV-cache total (1 secuencia)</span><b id="gqaTot" class="c-t"></b></div>
+      <div id="gqaBars" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div class="note">GQA conserva casi toda la calidad de MHA con <b class="c-w">4× menos</b> memoria de caché → más usuarios o contextos más largos por GPU.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6c. SWA ===================== -->
+<section class="slide diagram" data-topic="02 · Mistral" data-title="Sliding Window Attention">
+  <h2>Sliding Window Attention: ventana + capas</h2>
+  <p class="sub">Fila = token que pregunta (query), columna = token al que puede atender (key)</p>
+  <div class="body" style="flex-direction:row;gap:26px;align-items:center;margin-top:10px">
+    <svg id="swaSvg" viewBox="0 0 430 430" style="width:430px;flex:none"></svg>
+    <div class="grow" style="display:flex;flex-direction:column;gap:14px">
+      <label class="ctrl">Ventana W <input type="range" id="swaW" min="1" max="16" value="4"> <b class="code" id="swaWV"></b></label>
+      <label class="ctrl">Capas apiladas L <input type="range" id="swaL" min="1" max="5" value="1"> <b class="code" id="swaLV"></b></label>
+      <div class="panel">
+        <h4>Alcance del último token (t<sub>16</sub>)</h4>
+        <div id="swaStrip" style="display:flex;gap:3px;margin:8px 0"></div>
+        <div class="note" id="swaTxt" style="color:var(--text)"></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#00D4AA"></i>atendido (dentro de la ventana)</span>
+        <span><i style="background:#1E2636"></i>causal, pero fuera de la ventana</span>
+        <span><i style="background:#0A0E14;border:1px solid #1E2636"></i>futuro (prohibido)</span>
+      </div>
+      <div class="callout" style="font-size:16.5px">Mistral: W = 4096 y 32 capas → alcance teórico ≈ 4096 × 32 ≈ <b class="c-t">131 k tokens</b>, con costo O(n·W) por capa.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 7. DAPT ===================== -->
+<section class="slide" data-topic="03 · DAPT" data-src="7" data-title="Domain-Adaptive Pretraining (DAPT)">
+  <h2>Domain-Adaptive Pretraining (DAPT)</h2>
+  <div class="body">
+    <div class="flow" style="max-width:860px;align-self:center;width:100%">
+      <div class="fbox b">Modelo Base<small>(Mistral 7B)</small></div><div class="fa">→</div>
+      <div class="fbox t">Corpus de Dominio<small>(continúa entrenando)</small></div><div class="fa">→</div>
+      <div class="fbox o">Modelo Adaptado<small>al dominio</small></div>
+    </div>
+    <div class="g2">
+      <div class="card t"><h3 class="c-t">¿Qué es?</h3><p>Continuar el preentrenamiento (next-token prediction) sobre un corpus especializado, SIN cambiar la arquitectura.</p></div>
+      <div class="card b"><h3 class="c-b">¿Cuándo se usa?</h3><p>Cuando el dominio tiene vocabulario, estilo o conocimiento muy diferente al corpus de preentrenamiento: medicina, derecho, código, finanzas, biología molecular, etc.</p></div>
+      <div class="card o"><h3 class="c-o">Diferencia con SFT</h3><p>DAPT no requiere etiquetas ni pares instrucción-respuesta. Solo texto en bruto del dominio. Ajusta las representaciones internas y la distribución de tokens del dominio.</p></div>
+      <div class="card p"><h3 class="c-p">Señal de entrenamiento</h3><p>Cross-entropy loss sobre el token siguiente. Misma función de pérdida que el preentrenamiento original.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 8. DAPT DATOS ===================== -->
+<section class="slide" data-topic="03 · DAPT" data-src="8" data-title="DAPT — Datos, Proceso y Consideraciones">
+  <h2>DAPT — Datos, Proceso y Consideraciones</h2>
+  <div class="body">
+    <div class="row" style="gap:20px">
+      <div class="grow" style="display:flex;flex-direction:column;gap:10px">
+        <div class="card t" style="padding:11px 16px"><h3 style="font-size:17px;margin-bottom:4px">Recopilación del corpus</h3><p style="font-size:15px">Artículos científicos, manuales técnicos, foros especializados, código fuente. Mínimo ~1 GB de texto limpio para DAPT significativo.</p></div>
+        <div class="card t" style="padding:11px 16px"><h3 style="font-size:17px;margin-bottom:4px">Tokenización y preprocesamiento</h3><p style="font-size:15px">Usar el mismo tokenizador del modelo base. Limpiar duplicados, artefactos HTML, texto de baja calidad (perplejidad demasiado alta/baja).</p></div>
+        <div class="card t" style="padding:11px 16px"><h3 style="font-size:17px;margin-bottom:4px">Hiperparámetros típicos</h3><p style="font-size:15px;font-family:var(--mono)">LR: 1e-5 a 5e-5 · Batch: 512–2048 tokens por GPU<br>Épocas: 1–3 · Warmup + cosine decay</p></div>
+        <div class="card t" style="padding:11px 16px"><h3 style="font-size:17px;margin-bottom:4px">Mezcla con datos generales</h3><p style="font-size:15px">Para evitar olvido catastrófico, mezclar ~10–20 % de datos web generales con el corpus de dominio.</p></div>
+      </div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:10px">
+        <h3 style="margin:0;color:var(--white);font-size:19px">Riesgos y mitigaciones</h3>
+        <div class="card o" style="padding:10px 16px"><h3 style="font-size:16.5px;margin-bottom:3px">⚠ Olvido catastrófico</h3><p style="font-size:14.5px">El modelo pierde capacidades generales. → Mezcla de datos, LR baja, pocas épocas.</p></div>
+        <div class="card o" style="padding:10px 16px"><h3 style="font-size:16.5px;margin-bottom:3px">⚠ Distribution shift</h3><p style="font-size:14.5px">Corpus muy pequeño sobreajusta. → Aumentar datos o reducir pasos.</p></div>
+        <div class="card o" style="padding:10px 16px"><h3 style="font-size:16.5px;margin-bottom:3px">⚠ Tokenización fuera de vocabulario</h3><p style="font-size:14.5px">Términos técnicos se fragmentan en muchos tokens. → Evaluar coverage; a veces se extiende el vocab.</p></div>
+        <div class="card o" style="padding:10px 16px"><h3 style="font-size:16.5px;margin-bottom:3px">⚠ Evaluación</h3><p style="font-size:14.5px">Medir perplejidad en corpus de validación del dominio + benchmarks generales para detectar regresión.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 8b. MEZCLA DE DATOS ===================== -->
+<section class="slide diagram" data-topic="03 · DAPT" data-title="Mezcla de datos y olvido catastrófico">
+  <h2>Mezcla de datos y olvido catastrófico</h2>
+  <p class="sub">Mueve el porcentaje de texto general que entra en cada batch de DAPT</p>
+  <div class="body" style="gap:16px">
+    <label class="ctrl" style="font-size:18px">Datos generales en el batch <input type="range" id="mixP" min="0" max="60" value="15" style="width:320px"> <b class="code c-w" id="mixPV"></b></label>
+    <div class="panel">
+      <h4>Un batch de entrenamiento (cada bloque ≈ una secuencia)</h4>
+      <div id="mixBatch" style="display:grid;grid-template-columns:repeat(25,1fr);gap:4px;margin-top:8px"></div>
+      <div class="legend" style="margin-top:10px"><span><i style="background:#00D4AA"></i>corpus de dominio (p. ej. artículos médicos)</span><span><i style="background:#4A9EFF"></i>texto web general</span></div>
+    </div>
+    <div class="g2">
+      <div class="panel"><h4>Especialización en el dominio</h4><div class="bar"><i id="mixDom" style="background:#00D4AA"></i></div><div class="note" id="mixDomT" style="margin-top:6px"></div></div>
+      <div class="panel"><h4>Retención de capacidades generales</h4><div class="bar"><i id="mixGen" style="background:#4A9EFF"></i></div><div class="note" id="mixGenT" style="margin-top:6px"></div></div>
+    </div>
+    <div class="note">Barras <b>cualitativas e ilustrativas</b>: muestran la tendencia, no mediciones. En la práctica se verifica con perplejidad del dominio + benchmarks generales (MMLU, HellaSwag…). Zona recomendada: <b class="c-t">10–20 %</b>.</div>
+  </div>
+</section>
+
+<!-- ===================== 9. SFT ===================== -->
+<section class="slide" data-topic="04 · SFT" data-src="9" data-title="Supervised Fine-Tuning (SFT)">
+  <h2>Supervised Fine-Tuning (SFT)</h2>
+  <p class="sub">SFT transforma un modelo base (que predice tokens) en un asistente que sigue instrucciones. Se entrena con ejemplos <b class="c-w">[Instrucción → Respuesta]</b> usando cross-entropy sobre la respuesta.</p>
+  <div class="body">
+    <div class="flow">
+      <div class="fbox b">Modelo Base</div><div class="fa">→</div>
+      <div class="fbox t">Dataset de Instrucciones</div><div class="fa">→</div>
+      <div class="fbox o">SFT<small>(fine-tune)</small></div><div class="fa">→</div>
+      <div class="fbox p">Modelo Instruct</div>
+    </div>
+    <div class="g3">
+      <div class="card t"><h3 class="c-t">¿Qué aprende el modelo?</h3><p>A formatear respuestas, seguir el rol de asistente, respetar restricciones dadas en el prompt y adaptar el tono al contexto.</p></div>
+      <div class="card o"><h3 class="c-o">Diferencia con DAPT</h3><p>DAPT ajusta representaciones de conocimiento (<b class="c-w">qué sabe</b> el modelo). SFT ajusta el comportamiento (<b class="c-w">cómo responde</b>).</p></div>
+      <div class="card p"><h3 class="c-p">Combinación habitual</h3><p>Primero DAPT sobre dominio → luego SFT con instrucciones del dominio. Así el modelo es experto Y útil.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 10. FORMATO SFT ===================== -->
+<section class="slide" data-topic="04 · SFT" data-src="10" data-title="SFT — Formato de Datos de Entrenamiento">
+  <h2>SFT — Formato de Datos de Entrenamiento</h2>
+  <div class="body" style="gap:14px">
+    <div style="font-size:17px;color:var(--white)">Ejemplo de par instrucción → respuesta (formato Mistral Instruct):</div>
+<pre class="codeblock" style="white-space:pre-wrap"><span class="kw">&lt;s&gt;[INST]</span> <span class="str">Eres un asistente médico. Explica brevemente qué es la hipertensión.</span> <span class="kw">[/INST]</span>
+<span style="color:#00D4AA">La hipertensión es una condición crónica donde la presión arterial se mantiene elevada
+(≥130/80 mmHg). Es un factor de riesgo para enfermedades cardiovasculares.
+Se controla con cambios en el estilo de vida y, si es necesario, medicación.</span> <span class="kw">&lt;/s&gt;</span></pre>
+    <div style="font-size:17px;color:var(--white)">Formatos de plantilla más comunes:</div>
+    <div class="row" style="gap:12px">
+      <div class="card b grow" style="padding:12px 14px"><h3 style="font-size:17px">Alpaca</h3><pre class="codeblock" style="font-size:13.5px;padding:8px 10px">### Instruction:
+...
+### Response:
+...</pre></div>
+      <div class="card t grow" style="padding:12px 14px"><h3 style="font-size:17px">ChatML</h3><pre class="codeblock" style="font-size:13.5px;padding:8px 10px">&lt;|im_start|&gt;user
+...&lt;|im_end|&gt;
+&lt;|im_start|&gt;assistant
+...</pre></div>
+      <div class="card o grow" style="padding:12px 14px"><h3 style="font-size:17px">Mistral Instruct</h3><pre class="codeblock" style="font-size:13.5px;padding:8px 10px">[INST] ... [/INST]
+... &lt;/s&gt;</pre></div>
+      <div class="card p grow" style="padding:12px 14px"><h3 style="font-size:17px">ShareGPT</h3><p style="font-size:14.5px">Lista de mensajes <code>{role: user/assistant, content: ...}</code></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 11. PROCESO SFT ===================== -->
+<section class="slide" data-topic="04 · SFT" data-src="11" data-title="SFT — Proceso de Entrenamiento">
+  <h2>SFT — Proceso de Entrenamiento</h2>
+  <div class="body">
+    <div class="g2">
+      <div class="card t"><h3><span class="c-t">①</span> Curación del dataset</h3><p>Calidad &gt;&gt; cantidad. 1 000–10 000 pares de alta calidad superan a 100 000 pares ruidosos. Fuentes: Alpaca, FLAN, OpenAssistant, datasets de dominio etiquetados manualmente.</p></div>
+      <div class="card o"><h3><span class="c-o">②</span> Tokenización y máscara de pérdida</h3><p>Solo se computa la pérdida sobre los tokens de la <b class="c-w">RESPUESTA</b>, no sobre la instrucción. Esto evita que el modelo aprenda a 'repetir preguntas'.</p></div>
+      <div class="card b"><h3><span class="c-b">③</span> Hiperparámetros</h3><p style="font-family:var(--mono);font-size:15.5px">LR: 1e-4 a 3e-4 · Epochs: 1–5 · Batch efectivo: 64–256<br>Scheduler: cosine con warmup del 3–5 % de los pasos.</p></div>
+      <div class="card p"><h3><span class="c-p">④</span> Evaluación</h3><p>Benchmark de instrucciones: MT-Bench, AlpacaEval, métricas de dominio. Comparar con el modelo base para cuantificar la ganancia.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 11b. MÁSCARA DE PÉRDIDA ===================== -->
+<section class="slide diagram" data-topic="04 · SFT" data-title="¿Sobre qué tokens se calcula la pérdida?">
+  <h2>¿Sobre qué tokens se calcula la pérdida?</h2>
+  <p class="sub">Compara DAPT, SFT sin máscara y SFT con máscara. Los tokens tachados reciben la etiqueta <code>-100</code> y se ignoran.</p>
+  <div class="body" style="gap:14px;justify-content:flex-start;margin-top:16px">
+    <div class="row" style="gap:8px" id="maskBtns"></div>
+    <div class="panel" id="maskToks" style="min-height:170px;line-height:1.2"></div>
+    <div class="row" style="gap:16px;align-items:stretch">
+      <div class="panel grow"><h4>Tokens que contribuyen a la pérdida</h4><div class="big" id="maskCount"></div><div class="bar" style="margin-top:8px"><i id="maskBar" style="background:#00D4AA"></i></div></div>
+      <div class="panel" style="width:640px"><h4>¿Qué aprende el modelo en este modo?</h4><div id="maskTxt" style="font-size:16.5px;line-height:1.45"></div></div>
+    </div>
+    <p class="note" style="margin:0">Tokenización simplificada para ilustrar; el tokenizador real de Mistral produce otros cortes. En TRL: <code>DataCollatorForCompletionOnlyLM</code> aplica esta máscara.</p>
+  </div>
+</section>
+
+<!-- ===================== 12. POR QUÉ PEFT ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="12" data-title="¿Por qué necesitamos PEFT?">
+  <h2>¿Por qué necesitamos PEFT?</h2>
+  <div class="body">
+    <div class="card o">
+      <h3 class="c-o">El problema del full fine-tuning:</h3>
+      <p>Actualizar todos los parámetros de Mistral 7B requiere <b class="c-w">~28 GB de VRAM solo para los gradientes</b> (fp32). Para modelos de 70B o 405B, el full fine-tuning es imposible en hardware accesible.</p>
+    </div>
+    <div style="font-size:18px;color:var(--white);font-weight:600">Comparativa de recursos:</div>
+    <table class="t">
+      <tr><th>Método</th><th>Parámetros entrenables</th><th>VRAM aprox. (7B)</th><th>Calidad relativa</th></tr>
+      <tr><td>Full Fine-Tuning</td><td>100 % (7 000 M)</td><td>~28–80 GB</td><td>Referencia</td></tr>
+      <tr><td class="c-t">LoRA (r=16)</td><td>~0.1 % (8 M)</td><td>~6–10 GB</td><td>≈ 95–99 %</td></tr>
+      <tr><td class="c-p">QLoRA (4-bit + LoRA)</td><td>~0.1 % (8 M)</td><td>~4–6 GB</td><td>≈ 90–97 %</td></tr>
+      <tr><td>Prompt Tuning</td><td>~0.001 %</td><td>~4 GB</td><td>Variable</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 13. LoRA ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="13" data-title="LoRA — Low-Rank Adaptation">
+  <h2>LoRA — Low-Rank Adaptation</h2>
+  <div class="body" style="gap:16px">
+    <div class="callout" style="font-family:var(--mono);font-size:21px;text-align:center">W' = W₀ + ΔW = W₀ + <span class="c-t">B</span> · <span class="c-p">A</span> &nbsp;&nbsp;<span style="font-size:16px;color:var(--text)">donde B ∈ ℝ<sup>d×r</sup>, A ∈ ℝ<sup>r×k</sup>, r ≪ min(d, k)</span></div>
+    <div class="row" style="gap:14px">
+      <div class="card b grow"><h3 class="c-b" style="font-family:var(--mono)">W₀</h3><p>Peso original del modelo base. <b class="c-w">Congelado</b> (frozen). No se actualiza.</p></div>
+      <div class="card t grow"><h3 class="c-t" style="font-family:var(--mono)">ΔW = B·A</h3><p>Actualización de bajo rango. Solo B y A se optimizan.</p></div>
+      <div class="card o grow"><h3 class="c-o" style="font-family:var(--mono)">r (rango)</h3><p>Hiperparámetro clave. Valores típicos: 4, 8, 16, 64. Controla complejidad vs. eficiencia.</p></div>
+      <div class="card p grow"><h3 class="c-p" style="font-family:var(--mono)">α / r (escala)</h3><p>Factor de escala. α normalmente = r. Permite ajustar la magnitud del update.</p></div>
+    </div>
+    <div class="g2">
+      <div class="panel" style="font-size:16.5px"><b class="c-w">Inicialización:</b> A ~ Gaussian(0, σ²), B = 0 → ΔW = 0 al inicio (no perturba el modelo base).</div>
+      <div class="panel" style="font-size:16.5px"><b class="c-w">En inferencia:</b> W' = W₀ + BA se fusiona → cero overhead de latencia.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 13b. LoRA VISUAL ===================== -->
+<section class="slide diagram" data-topic="05 · PEFT y LoRA" data-title="LoRA visual: dos caminos y el rango r">
+  <h2>LoRA visual: dos caminos y el rango r</h2>
+  <p class="sub">La entrada x pasa por W₀ (congelado) y, en paralelo, por A → B (entrenable). Los resultados se suman.</p>
+  <div class="body" style="flex-direction:row;gap:24px;align-items:center;margin-top:10px">
+    <svg id="loraSvg" viewBox="0 0 560 450" style="width:540px;flex:none"></svg>
+    <div class="grow" style="display:flex;flex-direction:column;gap:12px">
+      <label class="ctrl" style="font-size:18px">Rango r <input type="range" id="loraR" min="0" max="7" value="4"> <b class="code c-w" id="loraRV"></b></label>
+      <div class="panel">
+        <h4>Una matriz de 4096 × 4096 (p. ej. q_proj)</h4>
+        <div class="kv"><span>Full fine-tuning: d × k</span><b>16,777,216</b></div>
+        <div class="kv"><span>LoRA: r × (d + k)</span><b id="loraP" class="c-t"></b></div>
+        <div class="kv"><span>Fracción entrenable</span><b id="loraPct" class="c-o"></b></div>
+        <div class="kv"><span>Escala α / r (con lora_alpha = 32)</span><b id="loraS"></b></div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+          <div class="note">Full FT</div><div class="bar"><i style="width:100%;background:#4A9EFF"></i></div>
+          <div class="note">LoRA</div><div class="bar"><i id="loraBar" style="background:#00D4AA"></i></div>
+        </div>
+      </div>
+      <div class="note" style="color:var(--text)">h = W₀·x + (α/r)·B·A·x. Como <b class="c-w">B = 0</b> al inicio, el modelo arranca idéntico al base. Al terminar, <code>merge_and_unload()</code> suma B·A dentro de W₀.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 14. DÓNDE ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="14" data-title="LoRA — ¿Dónde se aplican los adaptadores?">
+  <h2>LoRA — ¿Dónde se aplican los adaptadores?</h2>
+  <div class="body">
+    <div class="row" style="gap:24px">
+      <div class="grow" style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:17px;color:var(--white);font-weight:600;margin-bottom:4px">Capa Transformer — matrices objetivo de LoRA:</div>
+        <div class="card t" style="padding:9px 14px;display:flex;gap:14px;align-items:center"><b class="c-t" style="font-size:20px">✓</b><div><b class="c-w">Q (Query)</b> — Proyección de consulta en self-attention.</div></div>
+        <div class="card t" style="padding:9px 14px;display:flex;gap:14px;align-items:center"><b class="c-t" style="font-size:20px">✓</b><div><b class="c-w">K (Key)</b> — Proyección de llave en self-attention.</div></div>
+        <div class="card t" style="padding:9px 14px;display:flex;gap:14px;align-items:center"><b class="c-t" style="font-size:20px">✓</b><div><b class="c-w">V (Value)</b> — Proyección de valor en self-attention.</div></div>
+        <div class="card t" style="padding:9px 14px;display:flex;gap:14px;align-items:center"><b class="c-t" style="font-size:20px">✓</b><div><b class="c-w">O (Output)</b> — Proyección de salida de attention.</div></div>
+        <div class="card" style="padding:9px 14px;display:flex;gap:14px;align-items:center;opacity:.7"><b style="font-size:20px">–</b><div><b class="c-w">MLP gate / up / down</b> — Proyecciones en la red feed-forward.</div></div>
+        <div class="card" style="padding:9px 14px;display:flex;gap:14px;align-items:center;opacity:.7"><b style="font-size:20px">–</b><div><b class="c-w">Embeddings (opcional)</b> — Raramente modificados; aumenta el costo.</div></div>
+      </div>
+      <div style="width:400px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:17px;color:var(--white);font-weight:600;margin-bottom:4px">Conteo de parámetros LoRA:</div>
+<pre class="codeblock" style="font-size:15px;line-height:1.6"><span class="cm">Mistral 7B — 32 capas
+Cada capa: Q, K, V, O</span>
+d_model = <span class="nu">4 096</span>
+r = <span class="nu">16</span>
+
+<span class="cm">Params por capa:</span>
+4 × (4096 × 16 + 16 × 4096)
+= 4 × 131 072 = <span class="nu">524 288</span>
+
+<span class="cm">Total 32 capas:</span>
+≈ <span class="c-t">16.8 M parámetros</span>
+= <span class="c-o">0.24 %</span> del total
+<span class="cm">(vs. 7 000 M del base)</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 14b. CALCULADORA ===================== -->
+<section class="slide diagram" data-topic="05 · PEFT y LoRA" data-title="Calculadora de parámetros LoRA">
+  <h2>Calculadora de parámetros LoRA</h2>
+  <p class="sub">Elige módulos y rango. Equivale a <code>model.print_trainable_parameters()</code>.</p>
+  <div class="body" style="gap:12px;justify-content:flex-start;margin-top:12px">
+    <div class="mods" id="calcMods"></div>
+    <div class="row" style="gap:24px;align-items:center;flex-wrap:wrap">
+      <label class="ctrl">r <select id="calcR" style="background:#0A0E14;color:#fff;border:1px solid var(--edge);border-radius:6px;padding:4px 8px;font-size:15px"><option>4</option><option>8</option><option selected>16</option><option>32</option><option>64</option></select></label>
+      <label class="ctrl"><input type="checkbox" id="calcReal" checked> Dimensiones reales de Mistral (K y V proyectan a 1024 por GQA)</label>
+    </div>
+    <div class="row" style="gap:18px;align-items:stretch">
+      <div class="panel grow" style="padding:10px 14px"><table class="m" id="calcTab"></table></div>
+      <div class="panel" style="width:320px;display:flex;flex-direction:column;gap:8px">
+        <h4>Total (32 capas)</h4>
+        <div class="big c-t" id="calcTot"></div>
+        <div class="kv"><span>% de 7.24 B</span><b id="calcPct" class="c-o"></b></div>
+        <div class="kv"><span>Archivo del adaptador (bf16)</span><b id="calcMB"></b></div>
+        <div class="note" id="calcNote"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 15. QLoRA ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="15" data-title="QLoRA — Cuantización + LoRA">
+  <h2>QLoRA — Cuantización + LoRA</h2>
+  <p class="sub">QLoRA (Dettmers et al., 2023) combina cuantización NF4 (4-bit) del modelo base con adaptadores LoRA en fp16/bf16. Resultado: Mistral 7B cabe en una sola GPU de 6 GB con calidad casi indistinguible del full fine-tuning.</p>
+  <div class="body">
+    <div class="g2">
+      <div class="card b"><h3 class="c-b">NF4 Quantization</h3><p>Normal Float 4-bit: cuantiza pesos del modelo base a 4 bits usando una distribución normal centrada. Reduce memoria 4×.</p></div>
+      <div class="card t"><h3 class="c-t">Double Quantization</h3><p>Cuantiza también las constantes de cuantización. Ahorra ~0.37 bits/parámetro adicional.</p></div>
+      <div class="card o"><h3 class="c-o">Paginación de memoria</h3><p>Usa unified memory de NVIDIA para manejar spikes de VRAM. Evita OOM durante el entrenamiento.</p></div>
+      <div class="card p"><h3 class="c-p">Adaptadores LoRA bf16</h3><p>Los adaptadores LoRA siguen en bf16/fp16 para gradientes estables. Solo ellos se actualizan.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 15b. VRAM ===================== -->
+<section class="slide diagram" data-topic="05 · PEFT y LoRA" data-title="¿A dónde se va la VRAM?">
+  <h2>¿A dónde se va la VRAM?</h2>
+  <p class="sub">Memoria estimada para entrenar Mistral 7B (7.24 B parámetros), separada por componente</p>
+  <div class="body" style="gap:14px;justify-content:flex-start;margin-top:16px">
+    <svg id="vramSvg" viewBox="0 0 1140 330" style="width:100%"></svg>
+    <div class="legend">
+      <span><i style="background:#4A9EFF"></i>pesos del modelo</span><span><i style="background:#FF8C42"></i>gradientes</span>
+      <span><i style="background:#AA77FF"></i>estados del optimizador (Adam)</span><span><i style="background:#00D4AA"></i>adaptadores LoRA (pesos + grads + Adam)</span>
+    </div>
+    <div class="row" style="gap:16px">
+      <div class="panel grow" style="font-size:15.5px;line-height:1.45">Bytes por parámetro: fp32 = 4, bf16 = 2, NF4 ≈ 0.5. Adam guarda 2 estados por parámetro entrenable (8 B en fp32, ~2 B en 8-bit). Con LoRA, el modelo base no tiene gradientes ni estados de Adam: <b class="c-w">solo los ~14 M de parámetros del adaptador</b>.</div>
+      <div class="panel grow note" style="font-size:15px">Estimación sin <b>activaciones</b> (dependen del batch y la longitud de secuencia; <i>gradient checkpointing</i> las reduce) ni overhead del framework. Las cifras reales varían según la configuración.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 16. PANORAMA PEFT ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="16" data-title="PEFT — Panorama de Métodos">
+  <h2>PEFT — Panorama de Métodos</h2>
+  <div class="body">
+    <div class="g3">
+      <div class="card t"><h3 class="c-t">LoRA <span class="pill" style="margin-left:6px">★ Recomendado</span></h3><p>Matrices de bajo rango en pesos de atención. Fácil de implementar, ampliamente soportado.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Alta</b></p></div>
+      <div class="card b"><h3 class="c-b">AdaLoRA <span class="note">· Variante adaptativa</span></h3><p>Asigna rango dinámicamente según importancia del peso. Más eficiente que LoRA fijo.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Alta</b></p></div>
+      <div class="card o"><h3 class="c-o">IA³ <span class="note">· Muy eficiente</span></h3><p>Solo escala vectores internos. Parámetros mínimos (~0.01 %). Ideal para recursos muy limitados.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Media-Alta</b></p></div>
+      <div class="card p"><h3 class="c-p">Prefix Tuning <span class="note">· Sin tocar pesos</span></h3><p>Aprende prefijos de tokens 'virtuales' en cada capa. No modifica pesos del modelo.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Media</b></p></div>
+      <div class="card b"><h3 class="c-b">Prompt Tuning <span class="note">· Más simple</span></h3><p>Solo aprende tokens suaves en la entrada. Muy pocos parámetros pero menos flexible.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Media</b></p></div>
+      <div class="card o"><h3 class="c-o">Adapter Layers <span class="note">· Clásico (2019)</span></h3><p>Inserta pequeñas capas FFN entre capas del Transformer. Más overhead en inferencia.</p><p class="note" style="margin-top:8px">Calidad relativa: <b class="c-w">Alta</b></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 17. CÓDIGO ===================== -->
+<section class="slide" data-topic="05 · PEFT y LoRA" data-src="17" data-title="En la Práctica — Fine-tuning con LoRA y HuggingFace">
+  <h2>En la Práctica — Fine-tuning con LoRA y HuggingFace</h2>
+  <div class="body">
+<pre class="codeblock" style="font-size:16px;line-height:1.6"><span class="kw">from</span> transformers <span class="kw">import</span> AutoModelForCausalLM, AutoTokenizer
+<span class="kw">from</span> peft <span class="kw">import</span> LoraConfig, get_peft_model, TaskType
+<span class="kw">from</span> trl <span class="kw">import</span> SFTTrainer
+
+<span class="cm"># 1. Cargar modelo base</span>
+model = AutoModelForCausalLM.<span class="fn">from_pretrained</span>(<span class="str">"mistralai/Mistral-7B-v0.1"</span>,
+                                             load_in_4bit=<span class="kw">True</span>)   <span class="cm"># QLoRA</span>
+<span class="cm"># 2. Configurar LoRA</span>
+lora_cfg = <span class="fn">LoraConfig</span>(
+    r=<span class="nu">16</span>, lora_alpha=<span class="nu">32</span>,
+    target_modules=[<span class="str">"q_proj"</span>,<span class="str">"k_proj"</span>,<span class="str">"v_proj"</span>,<span class="str">"o_proj"</span>],
+    lora_dropout=<span class="nu">0.05</span>, task_type=TaskType.CAUSAL_LM
+)
+model = <span class="fn">get_peft_model</span>(model, lora_cfg)
+model.<span class="fn">print_trainable_parameters</span>()  <span class="cm"># → ~0.24% of params</span>
+
+<span class="cm"># 3. Entrenar con SFTTrainer (pares instrucción-respuesta)</span>
+trainer = <span class="fn">SFTTrainer</span>(model=model, train_dataset=dataset, ...)
+trainer.<span class="fn">train</span>()</pre>
+  </div>
+</section>
+
+<!-- ===================== 18. COMPARATIVA ===================== -->
+<section class="slide" data-topic="06 · Recapitulación" data-src="18" data-title="Comparativa: Full FT vs DAPT vs SFT vs LoRA">
+  <h2>Comparativa: Full FT vs DAPT vs SFT vs LoRA</h2>
+  <div class="body" style="gap:12px">
+    <table class="t">
+      <tr><th></th><th>Full Fine-Tuning</th><th class="c-t">DAPT</th><th class="c-o">SFT</th><th class="c-p">SFT + LoRA</th></tr>
+      <tr><td>Parámetros modificados</td><td>100 %</td><td>100 %</td><td>100 %</td><td class="c-p">~0.1–1 %</td></tr>
+      <tr><td>VRAM necesaria (7B)</td><td>28–80 GB</td><td>28–80 GB</td><td>28–80 GB</td><td class="c-p">6–12 GB</td></tr>
+      <tr><td>Datos necesarios</td><td>GB–TB</td><td>GB–TB</td><td>1 K–100 K pares</td><td>1 K–50 K pares</td></tr>
+      <tr><td>Riesgo de olvido</td><td class="c-r">Alto</td><td class="c-o">Medio</td><td class="c-o">Medio</td><td class="c-t">Bajo</td></tr>
+      <tr><td>Inferencia overhead</td><td>Ninguno</td><td>Ninguno</td><td>Ninguno</td><td>Ninguno*</td></tr>
+      <tr><td>Caso de uso típico</td><td>Preentrenamiento desde cero</td><td>Adaptar conocimiento</td><td>Comportamiento asistente</td><td>Fine-tuning eficiente</td></tr>
+    </table>
+    <p class="note" style="margin:0">* Con merge de pesos LoRA en inferencia, no hay overhead de latencia.</p>
+  </div>
+</section>
+
+<!-- ===================== 19. PIPELINE COMPLETO ===================== -->
+<section class="slide" data-topic="06 · Recapitulación" data-src="19" data-title="Pipeline Completo: Mistral → DAPT → SFT+LoRA">
+  <h2>Pipeline Completo: Mistral → DAPT → SFT+LoRA</h2>
+  <div class="body" style="gap:16px">
+    <div class="flow">
+      <div class="fbox b">Mistral 7B Base<small>7B parámetros<br>Open-source · Apache 2.0</small></div><div class="fa">→</div>
+      <div class="fbox t">DAPT · Dominio<small>Corpus especializado<br>Next-token loss · ~1–3 epochs</small></div><div class="fa">→</div>
+      <div class="fbox o">SFT + LoRA · Instrucciones<small>Pares instruc.→resp.<br>LoRA r=16 · ~2–5 epochs</small></div><div class="fa">→</div>
+      <div class="fbox p">Modelo Final<small>Experto en dominio<br>Sigue instrucciones · Listo para deploy</small></div>
+    </div>
+    <div style="font-size:18px;color:var(--white);font-weight:600">¿Por qué combinar DAPT + SFT + LoRA?</div>
+    <div class="g2">
+      <div class="card t"><h3 class="c-t">Conocimiento de dominio (DAPT)</h3><p>El modelo entiende terminología especializada antes de aprender a responder.</p></div>
+      <div class="card o"><h3 class="c-o">Comportamiento instruccionable (SFT)</h3><p>Pares instrucción-respuesta enseñan el formato y tono deseado.</p></div>
+      <div class="card p"><h3 class="c-p">Eficiencia de recursos (LoRA)</h3><p>Ejecutable en 1 GPU de consumo. Fine-tuning de horas, no días.</p></div>
+      <div class="card b"><h3 class="c-b">Modularidad</h3><p>Los adaptadores LoRA son archivos pequeños (~50 MB). Fácil versionado y distribución.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 20. EVALUACIÓN ===================== -->
+<section class="slide" data-topic="06 · Recapitulación" data-src="20" data-title="¿Cómo evaluamos el modelo entrenado?">
+  <h2>¿Cómo evaluamos el modelo entrenado?</h2>
+  <div class="body">
+    <div class="g2">
+      <div class="card t"><h3 class="c-t">Perplejidad (PPL)</h3><p>Mide qué tan bien el modelo predice texto de validación. PPL baja = modelo más seguro en sus predicciones. Útil para DAPT: comparar PPL en corpus del dominio antes/después.</p></div>
+      <div class="card o"><h3 class="c-o">MT-Bench / AlpacaEval</h3><p>Benchmarks de calidad de instrucción. Usan un LLM juez (GPT-4) para comparar respuestas. Esencial para evaluar SFT.</p></div>
+      <div class="card p"><h3 class="c-p">Métricas de dominio</h3><p>Dependen del caso de uso: F1, accuracy, ROUGE, BLEU, exactitud en Q&amp;A cerradas, métricas clínicas, legales, etc.</p></div>
+      <div class="card b"><h3 class="c-b">Regresión general</h3><p>Comparar en benchmarks generales (MMLU, HellaSwag, ARC) para detectar olvido catastrófico post fine-tuning.</p></div>
+    </div>
+    <div class="callout" style="font-size:17px;font-family:var(--mono);text-align:center">PPL = exp( −(1/N) · Σ log p(tokenᵢ | tokens anteriores) )</div>
+  </div>
+</section>
+
+<!-- ===================== 21. RECAP ===================== -->
+<section class="slide" data-topic="06 · Recapitulación" data-src="21" data-title="Recapitulación — Ideas Clave">
+  <h2>Recapitulación — Ideas Clave</h2>
+  <div class="body" style="gap:10px">
+    <div class="card b" style="display:grid;grid-template-columns:60px 1fr 330px;align-items:center;padding:12px 18px"><span class="num c-b">01</span><span style="font-size:17px">Los LLMs son Transformers entrenados en texto masivo. La escala trae capacidades emergentes.</span><span class="note c-b" style="text-align:right">Texto → Transformer → Predicción de token</span></div>
+    <div class="card t" style="display:grid;grid-template-columns:60px 1fr 330px;align-items:center;padding:12px 18px"><span class="num c-t">02</span><span style="font-size:17px">Mistral 7B es un modelo base open-source con innovaciones clave (GQA, SWA, RoPE, SwiGLU).</span><span class="note c-t" style="text-align:right">Pequeño pero muy capaz</span></div>
+    <div class="card o" style="display:grid;grid-template-columns:60px 1fr 330px;align-items:center;padding:12px 18px"><span class="num c-o">03</span><span style="font-size:17px">DAPT adapta el conocimiento del modelo a un dominio usando el mismo objetivo de preentrenamiento.</span><span class="note c-o" style="text-align:right">Corpus especializado + next-token loss</span></div>
+    <div class="card p" style="display:grid;grid-template-columns:60px 1fr 330px;align-items:center;padding:12px 18px"><span class="num c-p">04</span><span style="font-size:17px">SFT enseña al modelo a seguir instrucciones usando pares instrucción → respuesta.</span><span class="note c-p" style="text-align:right">Comportamiento, no solo conocimiento</span></div>
+    <div class="card t" style="display:grid;grid-template-columns:60px 1fr 330px;align-items:center;padding:12px 18px"><span class="num c-t">05</span><span style="font-size:17px">LoRA reduce los parámetros entrenables al ~0.1 % descomponiendo ΔW = BA en bajo rango.</span><span class="note c-t" style="text-align:right">Fine-tuning accesible en 1 GPU</span></div>
+  </div>
+</section>
+
+<!-- ===================== 22. GRACIAS ===================== -->
+<section class="slide" data-topic="06 · Recapitulación" data-src="22" data-title="¡Gracias! ¿Preguntas?">
+  <h2 style="font-size:52px">¡Gracias! <span class="c-t">¿Preguntas?</span></h2>
+  <div class="body" style="gap:14px">
+    <div style="font-size:18px;color:var(--white);font-weight:600">Recursos para explorar más:</div>
+    <div class="g2" style="gap:10px">
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://github.com/huggingface/peft" target="_blank" rel="noopener"><span class="c-t">●</span><span>HuggingFace PEFT library — <code>github.com/huggingface/peft</code></span></a>
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener"><span class="c-p">●</span><span>Paper LoRA — <i>LoRA: Low-Rank Adaptation of LLMs</i> (Hu et al., 2022)</span></a>
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://arxiv.org/abs/2305.14314" target="_blank" rel="noopener"><span class="c-p">●</span><span>Paper QLoRA — <i>Efficient Finetuning of Quantized LLMs</i> (Dettmers et al., 2023)</span></a>
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://arxiv.org/abs/2310.06825" target="_blank" rel="noopener"><span class="c-b">●</span><span>Paper Mistral — <i>Mistral 7B</i> (Jiang et al., 2023) — arXiv:2310.06825</span></a>
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://github.com/huggingface/trl" target="_blank" rel="noopener"><span class="c-o">●</span><span>TRL library (SFTTrainer) — <code>github.com/huggingface/trl</code></span></a>
+      <a class="repo" style="border-width:1px;border-color:var(--edge);font-size:15.5px" href="https://huggingface.co/learn" target="_blank" rel="noopener"><span class="c-o">●</span><span>Curso gratuito: Hugging Face NLP Course — <code>huggingface.co/learn</code></span></a>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="pill">NOTEBOOKS</span><span>Repositorio del taller:</span><code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+  </div>
+</section>
+
+</div></div>
+
+<div id="progress"></div>
+<nav id="menu" aria-label="Temas"></nav>
+<div id="nav">
+  <button id="bMenu" title="Temas (T)">☰ <span class="hide-sm">Temas</span></button>
+  <button id="bPrevT" class="hide-sm" title="Tema anterior (↑)">⏮</button>
+  <div class="center">
+    <button id="bPrev" title="Anterior (←)">◀ <span class="hide-sm">Anterior</span></button>
+    <span id="topicLabel"></span>
+    <span id="counter"></span>
+    <button id="bNext" class="primary" title="Siguiente (→)"><span class="hide-sm">Siguiente</span> ▶</button>
+  </div>
+  <button id="bNextT" class="hide-sm" title="Tema siguiente (↓)">⏭</button>
+  <button id="bFull" title="Pantalla completa (F)">⛶</button>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = "http://www.w3.org/2000/svg";
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const fmt = n => Math.round(n).toLocaleString("es-MX");
+function S(tag, attrs = {}, parent, text) {
+  const el = document.createElementNS(NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  if (text != null) el.textContent = text;
+  if (parent) parent.appendChild(el);
+  return el;
+}
+function arrowDefs(svg, id, color) {
+  const defs = S("defs", {}, svg);
+  const m = S("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  S("path", { d: "M0 0L10 5L0 10z", fill: color }, m);
+}
+function btnGroup(box, items, onPick) {
+  items.forEach(([k, label]) => { const b = document.createElement("button"); b.className = "btn"; b.dataset.k = k; b.textContent = label; b.onclick = () => onPick(k); box.appendChild(b); });
+  return k => [...box.children].forEach(b => b.classList.toggle("sel", b.dataset.k === k));
+}
+
+/* ============================== NAVEGACIÓN ============================== */
+const deck = $("#deck"), slides = $$(".slide");
+const topics = [];
+slides.forEach(s => {
+  const t = s.dataset.topic;
+  if (!topics.includes(t)) topics.push(t);
+  const f = document.createElement("div");
+  f.className = "foot";
+  f.textContent = s.dataset.src ? `Diapositiva PPTX ${s.dataset.src}` : "Diagrama adicional";
+  s.appendChild(f);
+  if (s.classList.contains("diagram")) {
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "DIAGRAMA INTERACTIVO";
+    s.insertBefore(b, s.firstElementChild);
+  }
+});
+const firstOfTopic = t => slides.findIndex(s => s.dataset.topic === t);
+const menu = $("#menu");
+topics.forEach(t => {
+  const h = document.createElement("h5");
+  h.textContent = t; menu.appendChild(h);
+  slides.forEach((s, i) => {
+    if (s.dataset.topic !== t) return;
+    const a = document.createElement("a");
+    a.dataset.i = i;
+    a.innerHTML = `<i>${i + 1}</i><span></span>${s.classList.contains("diagram") ? "<em>DIAGRAMA</em>" : ""}`;
+    a.querySelector("span").textContent = s.dataset.title;
+    a.onclick = () => { go(i); menu.classList.remove("open"); };
+    menu.appendChild(a);
+  });
+});
+let cur = -1;
+function go(i) {
+  i = Math.max(0, Math.min(slides.length - 1, i));
+  if (i === cur) return;
+  slides.forEach((s, k) => s.classList.toggle("before", k < i));
+  if (cur >= 0) slides[cur].classList.remove("active");
+  slides[i].classList.add("active");
+  cur = i;
+  $("#counter").textContent = `${i + 1} / ${slides.length}`;
+  $("#topicLabel").textContent = slides[i].dataset.topic;
+  $("#progress").style.width = `${((i + 1) / slides.length) * 100}%`;
+  $("#bPrev").disabled = i === 0;
+  $("#bNext").disabled = i === slides.length - 1;
+  $$("#menu a").forEach(a => a.classList.toggle("cur", +a.dataset.i === i));
+  history.replaceState(null, "", "#" + (i + 1));
+}
+function topicStep(dir) {
+  const ti = topics.indexOf(slides[cur].dataset.topic);
+  if (dir < 0 && cur !== firstOfTopic(topics[ti])) return go(firstOfTopic(topics[ti]));
+  go(firstOfTopic(topics[Math.max(0, Math.min(topics.length - 1, ti + dir))]));
+}
+$("#bPrev").onclick = () => go(cur - 1);
+$("#bNext").onclick = () => go(cur + 1);
+$("#bPrevT").onclick = () => topicStep(-1);
+$("#bNextT").onclick = () => topicStep(1);
+$("#bMenu").onclick = () => menu.classList.toggle("open");
+$("#bFull").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+$$("[data-goto]").forEach(el => el.onclick = () => go(firstOfTopic(el.dataset.goto)));
+document.addEventListener("keydown", e => {
+  const t = e.target;
+  if ((t.tagName === "INPUT" && t.type !== "checkbox") || t.tagName === "TEXTAREA" || t.tagName === "SELECT") return;
+  switch (e.key) {
+    case "ArrowRight": case "PageDown": case " ": go(cur + 1); break;
+    case "ArrowLeft": case "PageUp": go(cur - 1); break;
+    case "ArrowDown": topicStep(1); break;
+    case "ArrowUp": topicStep(-1); break;
+    case "Home": go(0); break;
+    case "End": go(slides.length - 1); break;
+    case "t": case "T": menu.classList.toggle("open"); break;
+    case "f": case "F": $("#bFull").click(); break;
+    case "Escape": menu.classList.remove("open"); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+let tx = null;
+$("#viewport").addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, { passive: true });
+$("#viewport").addEventListener("touchend", e => {
+  if (tx == null) return;
+  const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 60) go(cur + (dx < 0 ? 1 : -1));
+});
+function fit() {
+  const vp = $("#viewport"), pad = 16;
+  const sc = Math.min((vp.clientWidth - pad * 2) / 1280, (vp.clientHeight - pad * 2) / 720);
+  deck.style.transform = `scale(${sc})`;
+  deck.style.left = (vp.clientWidth - 1280 * sc) / 2 + "px";
+  deck.style.top = (vp.clientHeight - 720 * sc) / 2 + "px";
+}
+window.addEventListener("resize", fit);
+
+/* ============================== GQA ============================== */
+(() => {
+  const svg = $("#gqaSvg");
+  const modes = { MHA: [8, 32, "Multi-Head (MHA)"], GQA: [2, 8, "Grouped-Query (GQA)"], MQA: [1, 1, "Multi-Query (MQA)"] };
+  let mode = "GQA";
+  const sel = btnGroup($("#gqaBtns"), Object.keys(modes).map(k => [k, modes[k][2]]), k => { mode = k; render(); });
+  const qx = i => 40 + i * 80;
+  const ctx = $("#gqaCtx");
+  ctx.oninput = render;
+  const BYTES = n => 2 * 32 * n * 128 * 2;
+  function render() {
+    sel(mode);
+    const [nkv, realKv] = modes[mode];
+    svg.innerHTML = "";
+    S("text", { x: 0, y: 22, fill: "#B0BECC", "font-size": 15, "font-weight": 700 }, svg, "Cabezas de consulta (Q)");
+    S("text", { x: 0, y: 296, fill: "#B0BECC", "font-size": 15, "font-weight": 700 }, svg, "Cabezas K / V (se guardan en el KV-cache)");
+    const per = 8 / nkv;
+    const kvx = j => nkv === 8 ? qx(j) : 40 + (j * per + (per - 1) / 2) * 80;
+    for (let i = 0; i < 8; i++) {
+      const j = Math.floor(i / per);
+      S("line", { x1: qx(i) + 24, y1: 82, x2: kvx(j) + 24, y2: 206, stroke: ["#00D4AA", "#4A9EFF", "#FF8C42", "#AA77FF", "#00D4AA", "#4A9EFF", "#FF8C42", "#AA77FF"][nkv === 8 ? i : j], "stroke-width": 2, opacity: .8 }, svg);
+      S("rect", { x: qx(i), y: 36, width: 48, height: 46, rx: 8, fill: "#161B27", stroke: "#4A9EFF", "stroke-width": 2 }, svg);
+      S("text", { x: qx(i) + 24, y: 65, "text-anchor": "middle", fill: "#fff", "font-size": 15, "font-family": "Consolas,monospace" }, svg, "Q" + (i + 1));
+    }
+    for (let j = 0; j < nkv; j++) {
+      const x = kvx(j);
+      const w = nkv === 8 ? 48 : 64;
+      S("rect", { x: x + 24 - w / 2, y: 206, width: w, height: 30, rx: 6, fill: "rgba(0,212,170,.15)", stroke: "#00D4AA", "stroke-width": 2 }, svg);
+      S("text", { x: x + 24, y: 226, "text-anchor": "middle", fill: "#00D4AA", "font-size": 14, "font-family": "Consolas,monospace" }, svg, "K" + (j + 1));
+      S("rect", { x: x + 24 - w / 2, y: 240, width: w, height: 30, rx: 6, fill: "rgba(255,140,66,.15)", stroke: "#FF8C42", "stroke-width": 2 }, svg);
+      S("text", { x: x + 24, y: 260, "text-anchor": "middle", fill: "#FF8C42", "font-size": 14, "font-family": "Consolas,monospace" }, svg, "V" + (j + 1));
+    }
+    S("text", { x: 640, y: 316, "text-anchor": "end", fill: "#556677", "font-size": 13 }, svg, `${8 / nkv} cabeza(s) Q por cada par K/V`);
+    const k = +ctx.value * 1024;
+    $("#gqaCtxV").textContent = fmt(k) + " tokens";
+    $("#gqaN").textContent = realKv;
+    $("#gqaPer").textContent = fmt(BYTES(realKv) / 1024) + " KB";
+    const gib = b => (b / 2 ** 30).toFixed(2) + " GiB";
+    $("#gqaTot").textContent = gib(BYTES(realKv) * k);
+    const max = BYTES(32) * k;
+    $("#gqaBars").innerHTML = Object.keys(modes).map(m => {
+      const b = BYTES(modes[m][1]) * k;
+      return `<div style="display:grid;grid-template-columns:60px 1fr 90px;gap:8px;align-items:center;font-size:14px"><span class="code" style="color:${m === mode ? "#fff" : "#556677"}">${m}</span><div class="bar"><i style="width:${b / max * 100}%;background:${m === mode ? "#00D4AA" : "#2a3448"}"></i></div><span class="code" style="text-align:right">${gib(b)}</span></div>`;
+    }).join("");
+  }
+  render();
+})();
+
+/* ============================== SWA ============================== */
+(() => {
+  const svg = $("#swaSvg"), N = 16, C = 23, O = 50;
+  const Win = $("#swaW"), Lin = $("#swaL");
+  for (let i = 0; i < N; i++) {
+    S("text", { x: O - 8, y: O + i * C + 16, "text-anchor": "end", fill: "#556677", "font-size": 11, "font-family": "Consolas,monospace" }, svg, "t" + (i + 1));
+    S("text", { x: O + i * C + 11, y: O - 8, "text-anchor": "middle", fill: "#556677", "font-size": 11, "font-family": "Consolas,monospace" }, svg, i + 1);
+  }
+  S("text", { x: O + N * C / 2, y: 18, "text-anchor": "middle", fill: "#B0BECC", "font-size": 13 }, svg, "key (a quién atiende) →");
+  const cells = [];
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) cells.push(S("rect", { x: O + j * C, y: O + i * C, width: C - 2, height: C - 2, rx: 3 }, svg));
+  const strip = $("#swaStrip");
+  for (let j = 0; j < N; j++) { const d = document.createElement("div"); d.style.cssText = "flex:1;height:26px;border-radius:4px;display:grid;place-items:center;font-size:11px;font-family:Consolas,monospace"; d.textContent = j + 1; strip.appendChild(d); }
+  function render() {
+    const W = +Win.value, L = +Lin.value;
+    $("#swaWV").textContent = W; $("#swaLV").textContent = L;
+    cells.forEach((c, k) => {
+      const i = Math.floor(k / N), j = k % N;
+      const fill = j > i ? "#0A0E14" : i - j < W ? "#00D4AA" : "#1E2636";
+      c.setAttribute("fill", fill);
+      c.setAttribute("stroke", j > i ? "#1E2636" : "none");
+      c.setAttribute("opacity", i === N - 1 ? 1 : .75);
+    });
+    const reach = Math.min(N - 1, L * (W - 1));
+    [...strip.children].forEach((d, j) => {
+      const dist = N - 1 - j;
+      const direct = dist < W, viaLayers = dist <= reach;
+      d.style.background = direct ? "#00D4AA" : viaLayers ? "rgba(74,158,255,.6)" : "#1E2636";
+      d.style.color = direct || viaLayers ? "#0D1117" : "#556677";
+    });
+    $("#swaTxt").innerHTML = `Atención directa: <b class="c-t">${W}</b> tokens. Tras <b class="c-w">${L}</b> capa(s) la información puede llegar desde <b class="c-b">${reach + 1}</b> tokens atrás (≈ L × W). Celdas atendidas en la matriz: <b class="c-w">${cells.filter(c => c.getAttribute("fill") === "#00D4AA").length}</b> de ${N * (N + 1) / 2} posibles (causal completa).`;
+  }
+  Win.oninput = render; Lin.oninput = render;
+  render();
+})();
+
+/* ============================== MEZCLA DAPT ============================== */
+(() => {
+  const P = $("#mixP"), box = $("#mixBatch");
+  for (let i = 0; i < 50; i++) { const d = document.createElement("div"); d.style.cssText = "height:26px;border-radius:4px;transition:background .2s"; box.appendChild(d); }
+  function render() {
+    const p = +P.value;
+    $("#mixPV").textContent = p + " %";
+    const nGen = Math.round(p / 100 * 50);
+    // spread general sequences evenly across the batch
+    const isGen = new Array(50).fill(false);
+    for (let k = 0; k < nGen; k++) isGen[Math.floor((k + 0.5) * 50 / nGen)] = true;
+    [...box.children].forEach((d, i) => d.style.background = isGen[i] ? "#4A9EFF" : "#00D4AA");
+    const dom = 100 - p * 0.9, gen = Math.min(100, 25 + p * 3.2);
+    $("#mixDom").style.width = dom + "%";
+    $("#mixGen").style.width = gen + "%";
+    $("#mixDomT").textContent = p > 40 ? "Se diluye la señal del dominio: el modelo aprende la terminología más despacio." : "La mayor parte del batch es del dominio → adaptación fuerte.";
+    $("#mixGenT").textContent = p < 5 ? "Riesgo alto de olvido catastrófico: el modelo deja de ver texto general." : p <= 20 ? "Buen equilibrio: el modelo sigue viendo texto general." : "Retiene capacidades generales, a costa de más pasos de entrenamiento.";
+  }
+  P.oninput = render;
+  render();
+})();
+
+/* ============================== MÁSCARA DE PÉRDIDA ============================== */
+(() => {
+  const inst = ["<s>", "[INST]", " Eres", " un", " asistente", " médico", ".", " Explica", " brevemente", " qué", " es", " la", " hiper", "tensión", ".", " [/INST]"];
+  const resp = [" La", " hiper", "tensión", " es", " una", " condición", " crónica", " donde", " la", " presión", " arterial", " se", " mantiene", " elevada", ".", "</s>"];
+  const raw = [" La", " hiper", "tensión", " es", " una", " condición", " crónica", " donde", " la", " presión", " arterial", " se", " mantiene", " elevada", " (", "≥", "130", "/", "80", " mm", "Hg", ").", " Es", " un", " factor", " de", " riesgo", " cardiovascular", "."];
+  const modes = {
+    dapt: ["DAPT (texto en bruto)", () => raw.map(t => [t, true]),
+      "<b class='c-t'>Conocimiento del dominio.</b> Cada token del texto especializado es objetivo de predicción: el modelo absorbe vocabulario y hechos. No hay instrucciones ni roles."],
+    nomask: ["SFT sin máscara", () => [...inst, ...resp].map(t => [t, true]),
+      "<b class='c-o'>Aprende también a generar preguntas.</b> La instrucción cuenta en la pérdida, así que parte del gradiente se gasta en imitar el prompt del usuario ('repetir preguntas')."],
+    mask: ["SFT con máscara ✓", () => [...inst.map(t => [t, false]), ...resp.map(t => [t, true])],
+      "<b class='c-t'>Solo aprende a responder.</b> La instrucción se ve como contexto (el modelo la lee), pero sus etiquetas son <code>-100</code>: el gradiente viene únicamente de la respuesta."]
+  };
+  let mode = "mask";
+  const sel = btnGroup($("#maskBtns"), Object.keys(modes).map(k => [k, modes[k][0]]), k => { mode = k; render(); });
+  function render() {
+    sel(mode);
+    const toks = modes[mode][1]();
+    $("#maskToks").innerHTML = toks.map(([t, on]) => `<span class="tok ${on ? "on" : "off"}"><span>${esc(t)}</span><em>${on ? "loss" : "-100"}</em></span>`).join("");
+    const n = toks.filter(x => x[1]).length;
+    $("#maskCount").innerHTML = `${n} <span style="font-size:18px;color:#556677">/ ${toks.length}</span>`;
+    $("#maskBar").style.width = (n / toks.length * 100) + "%";
+    $("#maskTxt").innerHTML = modes[mode][2];
+  }
+  render();
+})();
+
+/* ============================== LoRA VISUAL ============================== */
+(() => {
+  const svg = $("#loraSvg");
+  arrowDefs(svg, "lA", "#B0BECC");
+  const RS = [1, 2, 4, 8, 16, 32, 64, 128];
+  const Rin = $("#loraR");
+  // static parts
+  S("text", { x: 280, y: 440, "text-anchor": "middle", fill: "#fff", "font-size": 20, "font-family": "Consolas,monospace", "font-weight": 700 }, svg, "x  (d = 4096)");
+  S("rect", { x: 40, y: 150, width: 210, height: 180, rx: 10, fill: "rgba(74,158,255,.12)", stroke: "#4A9EFF", "stroke-width": 2.5 }, svg);
+  S("text", { x: 145, y: 236, "text-anchor": "middle", fill: "#4A9EFF", "font-size": 30, "font-family": "Consolas,monospace", "font-weight": 700 }, svg, "W₀");
+  S("text", { x: 145, y: 266, "text-anchor": "middle", fill: "#B0BECC", "font-size": 14 }, svg, "4096 × 4096");
+  S("text", { x: 145, y: 290, "text-anchor": "middle", fill: "#B0BECC", "font-size": 14 }, svg, "❄ congelado");
+  S("path", { d: "M280 418 L280 400 L145 400 L145 334", fill: "none", stroke: "#B0BECC", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  S("path", { d: "M280 400 L420 400 L420 372", fill: "none", stroke: "#B0BECC", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  S("circle", { cx: 280, cy: 70, r: 22, fill: "#161B27", stroke: "#fff", "stroke-width": 2 }, svg);
+  S("text", { x: 280, y: 78, "text-anchor": "middle", fill: "#fff", "font-size": 24 }, svg, "+");
+  S("path", { d: "M145 146 L145 70 L254 70", fill: "none", stroke: "#B0BECC", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  S("path", { d: "M420 120 L420 70 L306 70", fill: "none", stroke: "#B0BECC", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  S("path", { d: "M280 48 L280 22", fill: "none", stroke: "#B0BECC", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  S("text", { x: 296, y: 22, fill: "#fff", "font-size": 18, "font-family": "Consolas,monospace", "font-weight": 700 }, svg, "h");
+  S("text", { x: 470, y: 160, fill: "#00D4AA", "font-size": 14 }, svg, "🔥 entrenable");
+  const A = S("path", { fill: "rgba(170,119,255,.18)", stroke: "#AA77FF", "stroke-width": 2.5 }, svg);
+  const B = S("path", { fill: "rgba(0,212,170,.18)", stroke: "#00D4AA", "stroke-width": 2.5 }, svg);
+  const tA = S("text", { "text-anchor": "middle", fill: "#AA77FF", "font-size": 15, "font-family": "Consolas,monospace", "font-weight": 700 }, svg);
+  const tB = S("text", { "text-anchor": "middle", fill: "#00D4AA", "font-size": 15, "font-family": "Consolas,monospace", "font-weight": 700 }, svg);
+  const tr = S("text", { "text-anchor": "start", fill: "#FF8C42", "font-size": 14, "font-family": "Consolas,monospace" }, svg);
+  function render() {
+    const r = RS[+Rin.value];
+    $("#loraRV").textContent = r;
+    const wr = 6 + Math.log2(r) * 9; // visual width of the bottleneck
+    // A: trapezoid from wide (bottom, 4096) to narrow (top, r)
+    A.setAttribute("d", `M${420 - 80} 370 L${420 + 80} 370 L${420 + wr / 2} 262 L${420 - wr / 2} 262 Z`);
+    B.setAttribute("d", `M${420 - wr / 2} 246 L${420 + wr / 2} 246 L${420 + 80} 124 L${420 - 80} 124 Z`);
+    tA.setAttribute("x", 420); tA.setAttribute("y", 335); tA.textContent = `A: ${r} × 4096`;
+    tB.setAttribute("x", 420); tB.setAttribute("y", 165); tB.textContent = `B: 4096 × ${r}`;
+    tr.setAttribute("x", 420 + wr / 2 + 10); tr.setAttribute("y", 258); tr.textContent = `r = ${r}`;
+    const p = r * 8192;
+    $("#loraP").textContent = fmt(p);
+    $("#loraPct").textContent = (p / 16777216 * 100).toFixed(2) + " %";
+    $("#loraS").textContent = (32 / r).toFixed(r > 32 ? 2 : 1);
+    $("#loraBar").style.width = Math.max(0.5, p / 16777216 * 100) + "%";
+  }
+  Rin.oninput = render;
+  render();
+})();
+
+/* ============================== CALCULADORA ============================== */
+(() => {
+  const mods = [
+    ["q_proj", 4096, 4096, 4096, true], ["k_proj", 4096, 1024, 4096, true], ["v_proj", 4096, 1024, 4096, true], ["o_proj", 4096, 4096, 4096, true],
+    ["gate_proj", 4096, 14336, 14336, false], ["up_proj", 4096, 14336, 14336, false], ["down_proj", 14336, 4096, 4096, false]
+  ];
+  const on = Object.fromEntries(mods.map(m => [m[0], m[4]]));
+  const box = $("#calcMods");
+  mods.forEach(([n]) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" ${on[n] ? "checked" : ""}> ${n}`;
+    l.querySelector("input").onchange = e => { on[n] = e.target.checked; render(); };
+    box.appendChild(l);
+  });
+  const R = $("#calcR"), real = $("#calcReal");
+  R.onchange = render; real.onchange = render;
+  const TOTAL = 7.24e9, LAYERS = 32;
+  function render() {
+    const r = +R.value;
+    let per = 0;
+    const rows = mods.map(([n, din, doutReal, doutSimple]) => {
+      const dout = real.checked ? doutReal : (n.startsWith("k") || n.startsWith("v") ? 4096 : doutSimple);
+      const p = r * (din + dout);
+      if (on[n]) per += p;
+      return `<tr class="${on[n] ? "" : "off"}"><td>${n}</td><td>${fmt(din)} × ${fmt(dout)}</td><td>${r} × (${fmt(din)} + ${fmt(dout)})</td><td>${fmt(p)}</td></tr>`;
+    });
+    $("#calcTab").innerHTML = `<tr><th>Módulo</th><th>Forma (in × out)</th><th>r × (in + out)</th><th>Params / capa</th></tr>${rows.join("")}<tr><td><b class="c-w">Por capa</b></td><td></td><td></td><td><b class="c-w">${fmt(per)}</b></td></tr>`;
+    const tot = per * LAYERS;
+    $("#calcTot").textContent = (tot / 1e6).toFixed(1) + " M";
+    $("#calcPct").textContent = (tot / TOTAL * 100).toFixed(3) + " %";
+    $("#calcMB").textContent = (tot * 2 / 1e6).toFixed(0) + " MB";
+    $("#calcNote").innerHTML = real.checked
+      ? "Con Q,K,V,O y r=16 da ≈ 13.6 M: menos que los 16.8 M de la diapositiva anterior, porque allí K y V se simplifican como 4096 × 4096."
+      : "Modo simplificado (como la diapositiva anterior): K y V se tratan como 4096 × 4096.";
+  }
+  render();
+})();
+
+/* ============================== VRAM ============================== */
+(() => {
+  const svg = $("#vramSvg");
+  const P = 7.24e9, LP = 13.6e6, GB = 1e9;
+  const rows = [
+    ["Full FT · fp32 + Adam", [[4 * P, "#4A9EFF"], [4 * P, "#FF8C42"], [8 * P, "#AA77FF"]]],
+    ["Full FT · bf16 + Adam 8-bit", [[2 * P, "#4A9EFF"], [2 * P, "#FF8C42"], [2 * P, "#AA77FF"]]],
+    ["LoRA · base en bf16", [[2 * P, "#4A9EFF"], [16 * LP, "#00D4AA"]]],
+    ["QLoRA · base en NF4", [[0.5 * P + 0.127 / 8 * P, "#4A9EFF"], [16 * LP, "#00D4AA"]]]
+  ];
+  const X0 = 250, W = 760, MAX = 120 * GB, x = b => X0 + b / MAX * W;
+  [[16, "T4 · 16 GB"], [24, "RTX 4090 · 24 GB"], [80, "A100 · 80 GB"]].forEach(([g, l], k) => {
+    S("line", { x1: x(g * GB), y1: 6, x2: x(g * GB), y2: 290, stroke: "#556677", "stroke-dasharray": "5 5" }, svg);
+    S("text", { x: x(g * GB) + 4, y: 306 + (k % 2) * 16, fill: "#556677", "font-size": 13 }, svg, l);
+  });
+  rows.forEach(([label, segs], i) => {
+    const y = 20 + i * 68;
+    S("text", { x: 0, y: y + 27, fill: "#fff", "font-size": 16, "font-weight": 600 }, svg, label);
+    let acc = 0;
+    segs.forEach(([b, c]) => {
+      S("rect", { x: x(acc), y, width: Math.max(2, x(acc + b) - x(acc)), height: 40, fill: c, rx: 3 }, svg);
+      acc += b;
+    });
+    S("text", { x: x(acc) + 8, y: y + 26, fill: "#fff", "font-size": 16, "font-family": "Consolas,monospace", "font-weight": 700 }, svg, "≈ " + (acc / GB).toFixed(1) + " GB");
+  });
+})();
+
+fit();
+const h = parseInt(location.hash.slice(1), 10);
+go(Number.isFinite(h) ? h - 1 : 0);
+})();
+</script>
+</body>
+</html>

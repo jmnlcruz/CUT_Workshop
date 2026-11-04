@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction to RAG Systems</title>
+<style>
+:root{
+  --navy:#020938; --blue:#065A82; --teal:#1C7293; --cyan:#00B4D8; --yellow:#F7C548;
+  --slate:#64748B; --ice:#E8F4F8; --line:#CCDDEE; --red:#D1495B; --green:#2A9D8F;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: Consolas, "Cascadia Mono", Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b1230;font-family:var(--sans);overflow:hidden}
+button{font-family:inherit}
+
+/* ---------- stage / scaling ---------- */
+#viewport{position:fixed;left:0;right:0;top:0;bottom:56px;overflow:hidden}
+#deck{position:absolute;width:1280px;height:720px;transform-origin:0 0;background:#fff;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);border-radius:6px;overflow:hidden}
+.slide{position:absolute;inset:0;padding:44px 64px 44px 76px;background:#fff;color:var(--navy);
+  display:flex;flex-direction:column;opacity:0;visibility:hidden;transform:translateX(30px);
+  transition:opacity .35s ease, transform .35s ease, visibility 0s linear .35s}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .35s ease, transform .35s ease}
+.slide.before{transform:translateX(-30px)}
+.slide::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:linear-gradient(var(--cyan),var(--blue))}
+.slide h2{font-family:var(--serif);font-size:40px;font-weight:700;margin:0;color:var(--navy);line-height:1.1}
+.slide .sub{color:var(--teal);font-size:21px;margin:8px 0 0}
+.slide .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;margin-top:18px;min-height:0}
+.foot{position:absolute;right:26px;bottom:14px;font-size:12px;color:var(--slate);letter-spacing:.04em}
+.badge{display:inline-block;align-self:flex-start;background:var(--yellow);color:var(--navy);font-size:12px;font-weight:700;
+  letter-spacing:.12em;padding:3px 10px;border-radius:4px;margin-bottom:10px}
+.tag{display:inline-block;background:var(--blue);color:#fff;font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 10px;border-radius:4px}
+.card{background:var(--ice);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.card h3{font-family:var(--serif);font-size:24px;margin:10px 0 8px;color:var(--navy)}
+.card p{margin:0;font-size:18px;line-height:1.4;color:#334155}
+.callout{background:var(--navy);color:#fff;border-left:6px solid var(--cyan);padding:14px 22px;border-radius:8px;font-size:20px;line-height:1.35}
+.callout b{color:var(--cyan)}
+.note{font-size:16px;color:var(--slate)}
+.row{display:flex;gap:22px}
+.grow{flex:1}
+.btn{border:1px solid var(--teal);background:#fff;color:var(--teal);padding:6px 14px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.btn:hover{background:var(--ice)}
+.btn.primary{background:var(--teal);color:#fff}
+.btn.primary:hover{background:var(--blue)}
+.btn.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ctrl{display:flex;align-items:center;gap:10px;font-size:16px;color:#334155}
+input[type=range]{accent-color:var(--teal);width:180px}
+code,.code{font-family:var(--mono)}
+svg text{font-family:var(--sans)}
+
+/* seq reveal animation */
+.slide [data-seq]{opacity:0;transform:translateY(8px)}
+.slide.play [data-seq]{animation:seqIn .45s ease forwards;animation-delay:calc(var(--d,0) * 1s)}
+@keyframes seqIn{to{opacity:1;transform:none}}
+
+/* ---------- title slide ---------- */
+.title-slide{background:radial-gradient(1200px 600px at 85% 30%, #0d2a5c 0%, var(--navy) 60%);color:#fff;justify-content:center}
+.title-slide::before{background:var(--cyan)}
+.title-slide .kicker{color:var(--cyan);letter-spacing:.18em;font-size:15px;font-weight:700;text-transform:uppercase}
+.title-slide h1{font-family:var(--serif);font-size:72px;line-height:1.05;margin:18px 0 14px;font-weight:700}
+.title-slide h1 span{color:var(--cyan)}
+.title-slide .lead{font-size:26px;color:#A0C8E0;margin:0 0 26px}
+.title-slide .meta{font-size:18px;color:#7098B8;margin-bottom:22px}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chips span{border:1px solid #1C7293;color:#CCE6F4;padding:6px 14px;border-radius:20px;font-size:15px;background:rgba(6,90,130,.35)}
+.title-slide svg.deco{position:absolute;right:40px;top:110px;width:470px;opacity:.95}
+
+/* ---------- agenda ---------- */
+.agenda{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.agenda .item{background:var(--ice);border:1px solid var(--line);border-radius:12px;padding:18px;cursor:pointer;position:relative;
+  transition:transform .15s, box-shadow .15s, border-color .15s}
+.agenda .item:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(6,90,130,.18);border-color:var(--cyan)}
+.agenda .num{width:38px;height:38px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px}
+.agenda .item:last-child{background:var(--navy);border-color:var(--navy)}
+.agenda .item:last-child .num{background:var(--cyan);color:var(--navy)}
+.agenda .item:last-child h4,.agenda .item:last-child p{color:#fff}
+.agenda h4{font-family:var(--serif);font-size:21px;margin:12px 0 4px}
+.agenda p{margin:0;font-size:15.5px;color:var(--slate)}
+.agenda .time{position:absolute;top:20px;right:16px;font-size:14px;font-weight:700;color:var(--teal)}
+.agenda .item:last-child .time{color:var(--yellow)}
+
+/* ---------- flow boxes (slide 4) ---------- */
+.flow3{display:flex;align-items:stretch;gap:14px}
+.flow3 .card{flex:1;text-align:center}
+.flow3 .arrow{display:grid;place-items:center;font-size:40px;color:var(--cyan);font-weight:700}
+
+/* ---------- lanes (diagram 3b) ---------- */
+.lane{display:flex;align-items:center;gap:10px;padding:16px 18px;border-radius:12px;border:2px solid}
+.lane.bad{border-color:#F1C0C6;background:#FDF3F4}
+.lane.good{border-color:#BFE3DD;background:#F0FAF8}
+.lane .lab{width:120px;font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase}
+.lane.bad .lab{color:var(--red)} .lane.good .lab{color:var(--green)}
+.node{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:17px;font-weight:600;text-align:center;flex:1;min-width:0}
+.node small{display:block;font-weight:400;font-size:13.5px;color:var(--slate);margin-top:3px}
+.node.dark{background:var(--navy);color:#fff;border-color:var(--navy)} .node.dark small{color:#A0C8E0}
+.node.docs{background:var(--ice);border-color:var(--cyan)}
+.node.badans{border-color:var(--red);background:#fff}
+.node.goodans{border-color:var(--green);background:#fff}
+.arr{color:var(--teal);font-size:24px;font-weight:700}
+
+/* ---------- table ---------- */
+table.t{border-collapse:collapse;width:100%;font-size:18px}
+table.t th{background:var(--navy);color:#fff;text-align:left;padding:10px 14px;font-weight:600}
+table.t td{padding:11px 14px;border-bottom:1px solid var(--line)}
+table.t tr:nth-child(even) td{background:#F5FAFC}
+.ok{color:var(--green);font-weight:700} .no{color:var(--red);font-weight:700}
+
+/* ---------- steps list ---------- */
+.steps{display:flex;flex-direction:column;gap:12px}
+.steps .s{display:flex;gap:14px;align-items:center;font-size:18px}
+.steps .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-weight:700}
+.dbopt{display:flex;gap:12px;align-items:baseline;padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:16.5px}
+.dbopt b{font-family:var(--serif);font-size:19px;width:96px;flex:none}
+.dbopt.today{border:2px solid var(--cyan);background:var(--ice)}
+.dbopt .pill{background:var(--cyan);color:var(--navy);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle}
+
+/* ---------- code ---------- */
+pre.codeblock{margin:0;background:#0b1430;color:#E2E8F0;border-radius:10px;padding:16px 20px;font-size:16.5px;line-height:1.5;font-family:var(--mono);overflow:auto;white-space:pre}
+.kw{color:#7DD3FC}.str{color:#FDE68A}.fn{color:#86EFAC}.cm{color:#94A3B8}
+
+/* ---------- chain (slide 10) ---------- */
+.chain{display:flex;align-items:stretch;gap:6px}
+.chain .box{flex:1;background:var(--ice);border:1.5px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center}
+.chain .box b{display:block;font-family:var(--serif);font-size:18px;line-height:1.15}
+.chain .box span{display:block;font-size:13.5px;color:var(--slate);margin-top:6px}
+.chain .box.llm{background:var(--navy);border-color:var(--navy);color:#fff} .chain .box.llm span{color:#A0C8E0}
+.chain .gt{display:grid;place-items:center;color:var(--cyan);font-size:26px;font-weight:700}
+
+/* ---------- interactive panels ---------- */
+.panel{background:#F8FBFD;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.panel h4{margin:0 0 8px;font-family:var(--serif);font-size:20px}
+.dim{opacity:.25;transition:opacity .3s}
+.chunktext{font-size:17px;line-height:1.75;font-family:var(--serif);background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;height:250px;overflow:auto}
+.chunktext span{border-radius:3px;padding:1px 0}
+.c0{background:#CDEBF6;box-shadow:inset 0 -2px 0 #00B4D8}
+.c1{background:#DCE3FB;box-shadow:inset 0 -2px 0 #5B7BE0}
+.c2{background:#D8F0E6;box-shadow:inset 0 -2px 0 #2A9D8F}
+.c3{background:#F0DDF3;box-shadow:inset 0 -2px 0 #A05BB5}
+.ov{background:#F7C548}
+.chunklist{display:flex;flex-wrap:wrap;gap:6px;max-height:70px;overflow:auto}
+.chunklist span{font-size:13px;padding:3px 8px;border-radius:12px;font-family:var(--mono)}
+.stat{display:flex;gap:26px;font-size:16px;color:#334155}
+.stat b{font-size:24px;color:var(--navy);display:block;font-family:var(--serif)}
+
+.simlist{display:flex;flex-direction:column;gap:6px}
+.simrow{display:grid;grid-template-columns:170px 1fr 56px;align-items:center;gap:8px;font-size:15px}
+.simrow .bar{height:12px;background:#EEF2F6;border-radius:6px;position:relative;overflow:hidden}
+.simrow .bar i{position:absolute;top:0;bottom:0;border-radius:6px}
+.simrow .v{font-family:var(--mono);text-align:right;font-size:14px}
+
+.res{display:flex;flex-direction:column;gap:6px;font-size:15px}
+.res div{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.res .dot{flex:none;width:12px;height:12px;border-radius:50%;margin-top:4px}
+
+table.q{border-collapse:collapse;font-size:15px;width:100%}
+table.q th{text-align:left;color:var(--slate);font-weight:600;padding:5px 8px;white-space:nowrap}
+table.q td{padding:5px 8px;font-family:var(--mono);text-align:center;border-left:1px solid var(--line);cursor:pointer}
+table.q td.selc{background:#FFF4D1}
+table.q tr:first-child td{font-weight:700}
+
+.valuebox{background:#0b1430;color:#E2E8F0;border-radius:10px;padding:14px 18px;font-family:var(--mono);font-size:15.5px;line-height:1.5;white-space:pre-wrap;height:220px;overflow:auto}
+.typechip{display:inline-block;font-family:var(--mono);font-size:13px;background:var(--yellow);color:var(--navy);padding:2px 8px;border-radius:4px;font-weight:700}
+
+.timeline{display:flex;height:30px;border-radius:6px;overflow:hidden;font-size:13px;font-weight:700;color:#fff}
+.timeline div{display:grid;place-items:center;border-right:2px solid #fff}
+
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.res-card{display:block;text-decoration:none;color:inherit;background:var(--ice);border:1px solid var(--line);border-radius:12px;padding:18px 20px;transition:transform .15s,border-color .15s}
+.res-card:hover{transform:translateY(-3px);border-color:var(--cyan)}
+.res-card b{font-family:var(--serif);font-size:22px;display:block}
+.res-card .u{color:var(--teal);font-family:var(--mono);font-size:14px;margin:6px 0;word-break:break-all}
+.res-card span{color:var(--slate);font-size:16px}
+
+.repo{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--navy);background:#fff;border:2px solid var(--cyan);
+  border-radius:10px;padding:12px 18px;font-size:18px;font-weight:600;transition:background .15s}
+.repo:hover{background:var(--ice)}
+.repo code{color:var(--teal);font-size:17px;font-weight:400}
+
+/* ---------- nav bar ---------- */
+#nav{position:fixed;left:0;right:0;bottom:0;height:56px;background:#050b24;border-top:1px solid #1a2550;display:flex;align-items:center;gap:8px;padding:0 14px;color:#CBD5E1;z-index:5}
+#nav button{background:#111c45;color:#E2E8F0;border:1px solid #233066;border-radius:8px;height:38px;min-width:42px;padding:0 12px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:6px}
+#nav button:hover:not(:disabled){background:#1b2a63;border-color:var(--cyan)}
+#nav button:disabled{opacity:.35;cursor:default}
+#nav .primary{background:var(--teal);border-color:var(--teal)}
+#nav .center{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-width:0}
+#topicLabel{font-size:15px;color:var(--cyan);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#counter{font-family:var(--mono);font-size:14px;color:#94A3B8;white-space:nowrap}
+#progress{position:fixed;left:0;bottom:56px;height:3px;background:var(--cyan);transition:width .3s;z-index:6}
+#menu{position:fixed;left:0;top:0;bottom:56px;width:340px;max-width:90vw;background:#050b24;border-right:1px solid #1a2550;color:#E2E8F0;
+  transform:translateX(-100%);transition:transform .25s;z-index:7;overflow:auto;padding:16px 0}
+#menu.open{transform:none}
+#menu h5{margin:14px 18px 4px;font-size:12px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase}
+#menu a{display:flex;gap:10px;padding:6px 18px 6px 26px;font-size:14.5px;color:#CBD5E1;text-decoration:none;cursor:pointer}
+#menu a:hover{background:#111c45}
+#menu a.cur{background:#16285e;color:#fff;border-left:3px solid var(--cyan);padding-left:23px}
+#menu a i{font-style:normal;font-family:var(--mono);color:#64748B;width:22px;flex:none}
+#menu a em{font-style:normal;font-size:11px;background:var(--yellow);color:var(--navy);border-radius:3px;padding:0 5px;margin-left:auto;align-self:center;font-weight:700}
+@media (max-width:640px){ #nav .hide-sm{display:none} #topicLabel{display:none} }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="deck">
+
+<!-- ===================== 1. TITLE ===================== -->
+<section class="slide title-slide" data-topic="Introduction" data-src="1" data-title="Introduction to RAG Systems">
+  <div style="max-width:640px;position:relative;z-index:1">
+    <div class="kicker">University Lecture &nbsp;|&nbsp; ~20 minutes</div>
+    <h1>Introduction to<br><span>RAG Systems</span></h1>
+    <p class="lead">Retrieval-Augmented Generation for Health Documents</p>
+    <div class="meta">LangChain &nbsp;•&nbsp; Mistral 7B &nbsp;•&nbsp; FAISS &nbsp;•&nbsp; Python</div>
+    <div class="chips"><span>LangChain</span><span>FAISS</span><span>Hugging Face</span><span>BitsAndBytes</span></div>
+  </div>
+  <svg class="deco" viewBox="0 0 470 470" aria-hidden="true">
+    <g stroke="#1C7293" stroke-width="1.5" fill="none" opacity=".8">
+      <path d="M70 110 L200 70 L330 140 L400 260 L300 380 L150 360 L80 240 Z"/>
+      <path d="M200 70 L230 230 L330 140 M230 230 L400 260 M230 230 L300 380 M230 230 L150 360 M230 230 L80 240 M70 110 L230 230"/>
+    </g>
+    <g fill="#00B4D8"><circle cx="70" cy="110" r="9"/><circle cx="200" cy="70" r="7"/><circle cx="330" cy="140" r="10"/><circle cx="400" cy="260" r="7"/><circle cx="300" cy="380" r="9"/><circle cx="150" cy="360" r="7"/><circle cx="80" cy="240" r="8"/></g>
+    <circle cx="230" cy="230" r="34" fill="#065A82" stroke="#00B4D8" stroke-width="3"/>
+    <text x="230" y="237" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">LLM</text>
+    <g fill="#F7C548"><rect x="300" y="40" width="44" height="56" rx="4"/><rect x="40" y="300" width="44" height="56" rx="4"/></g>
+    <g stroke="#020938" stroke-width="3"><path d="M308 56h28M308 66h28M308 76h20M48 316h28M48 326h28M48 336h20"/></g>
+  </svg>
+</section>
+
+<!-- ===================== 2. AGENDA ===================== -->
+<section class="slide" data-topic="Introduction" data-src="2" data-title="Agenda">
+  <h2>Agenda</h2>
+  <p class="sub">Click any topic to jump to it</p>
+  <div class="body">
+    <div class="agenda">
+      <div class="item" data-goto="The Problem with LLMs"><div class="num">1</div><span class="time">3 min</span><h4>The Problem with LLMs</h4><p>Knowledge cutoff &amp; hallucination</p></div>
+      <div class="item" data-goto="What is RAG?"><div class="num">2</div><span class="time">3 min</span><h4>What is RAG?</h4><p>High-level architecture overview</p></div>
+      <div class="item" data-goto="Chunking"><div class="num">3</div><span class="time">2 min</span><h4>Chunking</h4><p>Splitting documents into pieces</p></div>
+      <div class="item" data-goto="Embeddings"><div class="num">4</div><span class="time">3 min</span><h4>Embeddings</h4><p>Turning text into vectors</p></div>
+      <div class="item" data-goto="Vector Databases"><div class="num">5</div><span class="time">3 min</span><h4>Vector Databases</h4><p>Fast semantic search with FAISS</p></div>
+      <div class="item" data-goto="Quantization"><div class="num">6</div><span class="time">2 min</span><h4>Quantization</h4><p>Running Mistral 7B on a free GPU</p></div>
+      <div class="item" data-goto="Evaluation"><div class="num">7</div><span class="time">2 min</span><h4>Evaluation</h4><p>Measuring RAG quality</p></div>
+      <div class="item" data-goto="Hands-on Exercise"><div class="num">8</div><span class="time">30 min</span><h4>Hands-on Exercise</h4><p>Build it — 30 minutes</p></div>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="tag" style="background:var(--cyan);color:var(--navy)">NOTEBOOKS</span>
+      <span>Workshop repository:</span>
+      <code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+  </div>
+</section>
+
+<!-- ===================== 3. PROBLEM ===================== -->
+<section class="slide" data-topic="The Problem with LLMs" data-src="3" data-title="The Problem with LLMs">
+  <h2>The Problem with LLMs</h2>
+  <div class="body">
+    <div class="row">
+      <div class="card grow">
+        <span class="tag">CUTOFF</span>
+        <h3>Knowledge Cutoff</h3>
+        <p>LLMs are trained on data up to a fixed date. A model trained in 2023 knows nothing about a paper published in 2024.</p>
+        <svg viewBox="0 0 480 70" style="width:100%;margin-top:14px">
+          <line x1="10" y1="35" x2="470" y2="35" stroke="#CCDDEE" stroke-width="4"/>
+          <line x1="10" y1="35" x2="270" y2="35" stroke="#065A82" stroke-width="4"/>
+          <text x="140" y="22" text-anchor="middle" font-size="14" fill="#065A82">training data</text>
+          <line x1="270" y1="18" x2="270" y2="52" stroke="#D1495B" stroke-width="3" stroke-dasharray="4 3"/>
+          <text x="270" y="68" text-anchor="middle" font-size="13" fill="#D1495B" font-weight="700">cutoff (2023)</text>
+          <circle cx="390" cy="35" r="9" fill="#F7C548" stroke="#020938"/>
+          <text x="390" y="22" text-anchor="middle" font-size="14" fill="#020938">new paper (2024)</text>
+          <text x="390" y="62" text-anchor="middle" font-size="13" fill="#64748B">unknown to the model</text>
+        </svg>
+      </div>
+      <div class="card grow">
+        <span class="tag" style="background:var(--red)">HALLUC.</span>
+        <h3>Hallucination</h3>
+        <p>When a model doesn't know something, it may invent plausible-sounding but incorrect answers. This is dangerous in medical contexts.</p>
+        <div style="margin-top:14px;background:#fff;border:1px dashed var(--red);border-radius:8px;padding:10px 14px;font-size:16px;color:#334155">
+          <b style="color:var(--red)">Confident ≠ correct.</b> Fluent text gives no signal about whether a fact was actually learned.
+        </div>
+      </div>
+    </div>
+    <div class="callout"><b>RAG solves both:</b> it grounds the model in documents YOU supply — no retraining needed.</div>
+  </div>
+</section>
+
+<!-- ===================== 3b. DIAGRAM: WITHOUT vs WITH RAG ===================== -->
+<section class="slide diagram" data-topic="The Problem with LLMs" data-title="Without RAG vs. With RAG" data-replay>
+  <h2>Without RAG vs. With RAG</h2>
+  <p class="sub">Same question, two very different paths to an answer</p>
+  <div class="body" style="gap:18px">
+    <div class="panel" style="font-size:18px"><b>Question:</b> “What does our hospital's <u>2024</u> hypertension protocol recommend for screening?”</div>
+    <div class="lane bad">
+      <div class="lab">Without<br>RAG</div>
+      <div class="node" data-seq style="--d:.1">Question</div><div class="arr" data-seq style="--d:.3">→</div>
+      <div class="node dark" data-seq style="--d:.5">LLM<small>only its frozen training data (≤ 2023)</small></div><div class="arr" data-seq style="--d:.7">→</div>
+      <div class="node badans" style="flex:1.4;--d:.9" data-seq><span class="no">✗</span> Generic / invented answer<small>has never seen the 2024 protocol, may still sound confident</small></div>
+    </div>
+    <div class="lane good">
+      <div class="lab">With<br>RAG</div>
+      <div class="node" data-seq style="--d:1.3">Question</div><div class="arr" data-seq style="--d:1.5">→</div>
+      <div class="node" data-seq style="--d:1.7">Retriever<small>semantic search</small></div><div class="arr" data-seq style="--d:1.9">→</div>
+      <div class="node docs" data-seq style="--d:2.1">Your documents<small>2024 protocol PDF → top passages</small></div><div class="arr" data-seq style="--d:2.3">→</div>
+      <div class="node dark" data-seq style="--d:2.5">LLM + passages<small>reads, then answers</small></div><div class="arr" data-seq style="--d:2.7">→</div>
+      <div class="node goodans" data-seq style="--d:2.9"><span class="ok">✓</span> Grounded answer<small>traceable to a source</small></div>
+    </div>
+    <p class="note" style="margin:0">Updating knowledge = adding a document to the index, not retraining the model. <button class="btn" data-action="replay" style="margin-left:10px">↻ Replay</button></p>
+  </div>
+</section>
+
+<!-- ===================== 4. WHAT IS RAG ===================== -->
+<section class="slide" data-topic="What is RAG?" data-src="4" data-title="What is RAG?">
+  <h2>What is RAG?</h2>
+  <p class="sub"><b>Retrieval-Augmented Generation</b> = Search first, then generate.</p>
+  <div class="body">
+    <div class="flow3">
+      <div class="card"><span class="tag">DOCS</span><h3>Documents</h3><p>Your knowledge base:<br>PDFs, reports, articles</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><span class="tag">SEARCH</span><h3>Retrieval</h3><p>Find the most relevant<br>passages for the query</p></div>
+      <div class="arrow">→</div>
+      <div class="card"><span class="tag">GEN</span><h3>Generation</h3><p>LLM answers using ONLY<br>the retrieved passages</p></div>
+    </div>
+    <div class="callout"><b>Key insight:</b> the LLM does not memorise facts — it reads and summarises retrieved passages at query time.</div>
+  </div>
+</section>
+
+<!-- ===================== 5. ARCHITECTURE (interactive) ===================== -->
+<section class="slide" data-topic="What is RAG?" data-src="5" data-title="RAG Architecture" id="s-arch">
+  <h2>RAG Architecture</h2>
+  <p class="sub">Two phases: build the index once, then query it for every question. Step through it below.</p>
+  <div class="body" style="gap:12px;justify-content:flex-start">
+    <svg id="archSvg" viewBox="0 0 1152 400" style="width:100%;height:395px"></svg>
+    <div class="row" style="align-items:center;gap:14px">
+      <button class="btn" id="archPrev">◀ Step</button>
+      <button class="btn primary" id="archNext">Step ▶</button>
+      <button class="btn" id="archAll">Show all</button>
+      <div class="panel grow" id="archText" style="padding:10px 16px;font-size:17px;min-height:48px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6. CHUNKING ===================== -->
+<section class="slide" data-topic="Chunking" data-src="6" data-title="Document Processing & Chunking">
+  <h2>Document Processing &amp; Chunking</h2>
+  <p class="sub">Why can't we pass the whole document to the LLM?</p>
+  <div class="body" style="gap:18px">
+    <div class="row">
+      <div class="card grow"><h3 style="margin-top:0">Context window limit</h3><p>Most LLMs accept 4k–32k tokens. A textbook = millions of tokens.</p></div>
+      <div class="card grow"><h3 style="margin-top:0">Cost</h3><p>Longer prompts = more compute and API cost at inference time.</p></div>
+      <div class="card grow"><h3 style="margin-top:0">Relevance</h3><p>Passing irrelevant paragraphs confuses and degrades the model.</p></div>
+    </div>
+    <div>
+      <div style="font-weight:700;font-size:18px;margin-bottom:8px">How chunking works:</div>
+      <svg viewBox="0 0 1130 170" style="width:100%">
+        <rect x="0" y="0" width="1130" height="42" rx="6" fill="#020938"/>
+        <text x="565" y="27" text-anchor="middle" fill="#fff" font-size="17">Full Document  (too long for a single LLM call)</text>
+        <g fill="#F7C548" opacity=".55">
+          <rect x="268" y="56" width="34" height="108"/><rect x="547" y="56" width="34" height="108"/><rect x="826" y="56" width="34" height="108"/>
+        </g>
+        <g font-size="17" font-weight="700" text-anchor="middle" fill="#fff">
+          <rect x="0" y="60" width="302" height="44" rx="6" fill="#065A82"/><text x="151" y="88">Chunk 1</text>
+          <rect x="268" y="114" width="313" height="44" rx="6" fill="#1C7293"/><text x="424" y="142">Chunk 2</text>
+          <rect x="547" y="60" width="313" height="44" rx="6" fill="#065A82"/><text x="703" y="88">Chunk 3</text>
+          <rect x="826" y="114" width="304" height="44" rx="6" fill="#1C7293"/><text x="978" y="142">Chunk 4</text>
+        </g>
+        <g fill="#F7C548"><rect x="268" y="60" width="34" height="44" rx="2"/><rect x="547" y="114" width="34" height="44" rx="2"/><rect x="826" y="60" width="34" height="44" rx="2"/>
+        <rect x="268" y="114" width="34" height="44" rx="2"/><rect x="547" y="60" width="34" height="44" rx="2"/><rect x="826" y="114" width="34" height="44" rx="2"/></g>
+      </svg>
+      <p class="note" style="margin:6px 0 0"><span style="background:var(--yellow);padding:0 6px;border-radius:3px;color:var(--navy)">Yellow</span> = overlap zone — ensures sentences at boundaries are not cut mid-meaning.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6b. CHUNKING PLAYGROUND ===================== -->
+<section class="slide diagram" data-topic="Chunking" data-title="Chunking Playground">
+  <h2>Chunking Playground</h2>
+  <p class="sub">Move the sliders and watch how chunk size and overlap split a health document</p>
+  <div class="body" style="gap:12px;justify-content:flex-start;margin-top:14px">
+    <div class="row" style="align-items:center;gap:28px;flex-wrap:wrap">
+      <label class="ctrl">Chunk size <input type="range" id="chSize" min="80" max="500" step="10" value="200"> <b id="chSizeV" class="code">200</b> chars</label>
+      <label class="ctrl">Overlap <input type="range" id="chOv" min="0" max="150" step="5" value="40"> <b id="chOvV" class="code">40</b> chars</label>
+      <label class="ctrl"><input type="checkbox" id="chWord" checked> Break at spaces (like RecursiveCharacterTextSplitter)</label>
+    </div>
+    <div class="chunktext" id="chText"></div>
+    <div class="row" style="align-items:center">
+      <div class="stat" id="chStats"></div>
+      <div class="chunklist grow" id="chList"></div>
+    </div>
+    <p class="note" style="margin:0">Smaller chunks → more precise retrieval but less context per chunk. More overlap → safer boundaries but duplicated text in the index. The exercise uses <b>500 / 50</b>.</p>
+  </div>
+</section>
+
+<!-- ===================== 7. EMBEDDINGS ===================== -->
+<section class="slide" data-topic="Embeddings" data-src="7" data-title="Embeddings">
+  <h2>Embeddings</h2>
+  <p class="sub">Converting text into numbers that capture meaning</p>
+  <div class="body" style="gap:18px">
+    <p style="font-size:19px;line-height:1.45;margin:0;color:#334155">An embedding is a <b>vector of floating-point numbers</b> (e.g. 384 values) where texts with similar meaning produce vectors that are <b>close together in space</b>. We compare them using <b>cosine similarity</b>.</p>
+    <table class="t">
+      <tr><th>Input text</th><th></th><th>Embedding vector (first 3 of 384 dims)</th><th>Verdict</th></tr>
+      <tr><td>"heart attack symptoms"</td><td>→</td><td class="code">[0.12, -0.34,  0.89, ...]</td><td class="ok">similar (medical synonym)</td></tr>
+      <tr><td>"myocardial infarction"</td><td>→</td><td class="code">[0.11, -0.31,  0.91, ...]</td><td class="ok">similar (medical synonym)</td></tr>
+      <tr><td>"spaghetti carbonara"</td><td>→</td><td class="code">[-0.70,  0.55, -0.12, ...]</td><td class="no">different (unrelated topic)</td></tr>
+    </table>
+    <div class="callout" style="font-size:17px"><b>Model used:</b> all-MiniLM-L6-v2 &nbsp;|&nbsp; 80 MB &nbsp;|&nbsp; 384 dimensions &nbsp;|&nbsp; fast on CPU</div>
+  </div>
+</section>
+
+<!-- ===================== 7b. EMBEDDING SPACE ===================== -->
+<section class="slide diagram" data-topic="Embeddings" data-title="Exploring the Embedding Space">
+  <h2>Exploring the Embedding Space</h2>
+  <p class="sub">Click any phrase to use it as the query — similarity is the angle between vectors</p>
+  <div class="body" style="flex-direction:row;gap:24px;align-items:stretch;margin-top:10px">
+    <svg id="embSvg" viewBox="0 0 640 470" style="width:620px;height:520px;flex:none"></svg>
+    <div class="grow" style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+      <div class="panel">
+        <h4>Query: <span id="embQ" style="color:var(--teal)"></span></h4>
+        <div class="simlist" id="embList"></div>
+      </div>
+      <div class="note" style="line-height:1.45">
+        cos(θ) = <span class="code">A·B / (‖A‖‖B‖)</span><br>
+        <b>≈ 1</b> same direction (same meaning) &nbsp;·&nbsp; <b>≈ 0</b> unrelated &nbsp;·&nbsp; <b>&lt; 0</b> opposite<br>
+        Only the <i>angle</i> matters, not the arrow length. Real embeddings have 384 dimensions; this is a 2-D illustration.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 8. VECTOR DBS ===================== -->
+<section class="slide" data-topic="Vector Databases" data-src="8" data-title="Vector Databases">
+  <h2>Vector Databases</h2>
+  <p class="sub">Storing and searching embeddings at scale</p>
+  <div class="body">
+    <div class="row" style="gap:36px">
+      <div class="grow">
+        <h3 style="font-family:var(--serif);font-size:24px;margin:0 0 14px">How it works</h3>
+        <div class="steps">
+          <div class="s"><div class="n">1</div>Each chunk is embedded → stored as a vector</div>
+          <div class="s"><div class="n">2</div>Query is also embedded → query vector</div>
+          <div class="s"><div class="n">3</div>Nearest-neighbour search finds the K most similar vectors</div>
+          <div class="s"><div class="n">4</div>Corresponding text chunks are returned to the LLM</div>
+        </div>
+      </div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:9px">
+        <h3 style="font-family:var(--serif);font-size:24px;margin:0 0 5px">Vector DB options</h3>
+        <div class="dbopt today"><b>FAISS<span class="pill">today</span></b>In-memory, no server needed. Used in this exercise.</div>
+        <div class="dbopt"><b>Chroma</b>Local persistent store, easy to set up.</div>
+        <div class="dbopt"><b>Pinecone</b>Managed cloud service, production-grade.</div>
+        <div class="dbopt"><b>Weaviate</b>Open-source, scalable, rich query language.</div>
+      </div>
+    </div>
+    <div class="callout" style="font-size:18px"><b>Similarity metric:</b> cosine similarity — measures the angle between vectors, not magnitude.</div>
+  </div>
+</section>
+
+<!-- ===================== 8b. TOP-K SEARCH ===================== -->
+<section class="slide diagram" data-topic="Vector Databases" data-title="Top-K Nearest-Neighbour Search">
+  <h2>Top-K Nearest-Neighbour Search</h2>
+  <p class="sub">Every dot is a chunk from one of the 4 health PDFs. Pick a question and a value of K.</p>
+  <div class="body" style="flex-direction:row;gap:22px;align-items:stretch;margin-top:12px">
+    <svg id="knnSvg" viewBox="0 0 600 440" style="width:600px;height:450px;flex:none;background:#F8FBFD;border:1px solid var(--line);border-radius:12px"></svg>
+    <div class="grow" style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div style="display:flex;flex-direction:column;gap:6px" id="knnQs"></div>
+      <label class="ctrl">K = <input type="range" id="knnK" min="1" max="8" value="4"> <b id="knnKV" class="code">4</b></label>
+      <div class="res" id="knnRes"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 9. QUANTIZATION ===================== -->
+<section class="slide" data-topic="Quantization" data-src="9" data-title="Mistral 7B + 4-bit Quantization">
+  <h2>Mistral 7B + 4-bit Quantization</h2>
+  <p class="sub">How do we run a 7-billion-parameter model on a free Colab GPU?</p>
+  <div class="body">
+    <div class="row" style="gap:30px;align-items:center">
+      <div class="grow">
+        <div style="font-weight:700;font-size:18px;margin-bottom:6px">VRAM required:</div>
+        <svg viewBox="0 0 700 250" style="width:100%">
+          <g font-size="16" fill="#020938">
+            <text x="0" y="42">fp32  (full)</text><text x="0" y="97">fp16  (half)</text><text x="0" y="152">int8  (8-bit)</text><text x="0" y="207">nf4   (4-bit)</text>
+          </g>
+          <g>
+            <rect x="120" y="22" width="532" height="30" rx="4" fill="#D1495B"/><text x="642" y="43" text-anchor="end" fill="#fff" font-weight="700" font-size="16">28 GB</text>
+            <rect x="120" y="77" width="266" height="30" rx="4" fill="#065A82"/><text x="376" y="98" text-anchor="end" fill="#fff" font-weight="700" font-size="16">14 GB</text>
+            <rect x="120" y="132" width="133" height="30" rx="4" fill="#1C7293"/><text x="245" y="153" text-anchor="end" fill="#fff" font-weight="700" font-size="16">7 GB</text>
+            <rect x="120" y="187" width="76" height="30" rx="4" fill="#00B4D8"/><text x="204" y="208" font-weight="700" font-size="16" fill="#020938">4 GB</text>
+          </g>
+          <line x1="424" y1="8" x2="424" y2="232" stroke="#D1495B" stroke-width="2.5" stroke-dasharray="6 4"/>
+          <text x="430" y="246" fill="#D1495B" font-size="14" font-weight="700">T4 GPU (16 GB)</text>
+        </svg>
+      </div>
+      <div class="card" style="width:340px;flex:none;background:var(--navy);border-color:var(--navy);color:#fff">
+        <span class="tag" style="background:var(--cyan);color:var(--navy)">NF4 Quantization</span>
+        <div style="font-family:var(--serif);font-size:30px;margin:12px 0 6px">16 bits → 4 bits</div>
+        <div style="font-size:18px;line-height:1.6">Size: <b style="color:var(--cyan)">4x smaller</b><br>Quality loss: <b style="color:var(--cyan)">&lt;1%</b></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1C7293;font-size:16px;color:#A0C8E0"><code style="color:var(--yellow)">double_quant=True</code> saves an extra 0.5 GB by compressing the scale constants too.</div>
+      </div>
+    </div>
+    <div class="callout" style="font-size:18px">Mistral 7B with nf4 uses <b>~4-5 GB VRAM</b> — well within the T4's 16 GB.</div>
+  </div>
+</section>
+
+<!-- ===================== 9b. NF4 ===================== -->
+<section class="slide diagram" data-topic="Quantization" data-title="How NF4 Quantization Works">
+  <h2>How NF4 Quantization Works</h2>
+  <p class="sub">A block of weights is scaled to [-1, 1], then each weight snaps to 1 of 16 levels → a 4-bit code</p>
+  <div class="body" style="gap:10px;justify-content:flex-start;margin-top:8px">
+    <svg id="nf4Svg" viewBox="0 0 1100 215" style="width:100%"></svg>
+    <div class="panel" style="padding:10px 14px">
+      <table class="q" id="nf4Tab"></table>
+    </div>
+    <div class="row" style="align-items:center;gap:16px">
+      <button class="btn primary" id="nf4New">↻ New random block</button>
+      <div class="note grow" style="font-size:15px;line-height:1.4">
+        <b>1.</b> scale = absmax of the block &nbsp; <b>2.</b> normalise w / scale &nbsp; <b>3.</b> snap to nearest NF4 level &nbsp; <b>4.</b> store 4-bit code + 1 scale per 64 weights.<br>
+        NF4 levels are quantiles of a normal distribution — <b>denser near 0</b>, where most weights live. <code>double_quant</code> also quantizes the scales (≈0.5 → 0.13 bits per weight).
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 10. PIPELINE ===================== -->
+<section class="slide" data-topic="The RAG Pipeline" data-src="10" data-title="The Complete RAG Pipeline">
+  <h2>The Complete RAG Pipeline</h2>
+  <p class="sub">LangChain LCEL (LangChain Expression Language) wires the steps together:</p>
+  <div class="body" style="gap:18px">
+    <div class="chain">
+      <div class="box"><b>User<br>Query</b><span>str input</span></div><div class="gt">›</div>
+      <div class="box"><b>Parallel<br>Router</b><span>retriever + passthrough</span></div><div class="gt">›</div>
+      <div class="box"><b>FAISS<br>Retriever</b><span>top-k chunks</span></div><div class="gt">›</div>
+      <div class="box"><b>Prompt<br>Template</b><span>formats context + question</span></div><div class="gt">›</div>
+      <div class="box llm"><b>Mistral<br>7B</b><span>generates answer</span></div><div class="gt">›</div>
+      <div class="box"><b>Output<br>Parser</b><span>cleans response</span></div>
+    </div>
+<pre class="codeblock">rag_chain = (
+    <span class="fn">RunnableParallel</span>({<span class="str">"context"</span>: retriever | format_docs,
+                      <span class="str">"question"</span>: <span class="fn">RunnablePassthrough</span>()})
+    | prompt  |  llm  |  <span class="fn">StrOutputParser</span>()
+)
+answer = rag_chain.<span class="fn">invoke</span>(<span class="str">"What are the risk factors for diabetes?"</span>)</pre>
+    <div class="callout" style="font-size:18px">The chain retrieves relevant chunks, formats them into the prompt, and Mistral generates a <b>grounded answer</b>.</div>
+  </div>
+</section>
+
+<!-- ===================== 10b. LCEL DATA FLOW ===================== -->
+<section class="slide diagram" data-topic="The RAG Pipeline" data-title="Data Flowing Through the Chain">
+  <h2>Data Flowing Through the Chain</h2>
+  <p class="sub">What does the value look like after each <code>|</code> ? Step through one call to <code>rag_chain.invoke()</code></p>
+  <div class="body" style="gap:12px;justify-content:flex-start;margin-top:12px">
+    <svg id="lcelSvg" viewBox="0 0 1150 220" style="width:100%"></svg>
+    <div class="row" style="align-items:center;gap:12px">
+      <button class="btn" id="lcelPrev">◀ Back</button>
+      <button class="btn primary" id="lcelNext">Next stage ▶</button>
+      <span class="typechip" id="lcelType"></span>
+      <span id="lcelTitle" style="font-weight:700;font-size:18px"></span>
+    </div>
+    <div class="valuebox" id="lcelVal"></div>
+  </div>
+</section>
+
+<!-- ===================== 11. EVALUATION ===================== -->
+<section class="slide" data-topic="Evaluation" data-src="11" data-title="Evaluating RAG Quality">
+  <h2>Evaluating RAG Quality</h2>
+  <p class="sub">How do we know the system is working well?</p>
+  <div class="body">
+    <div class="row">
+      <div class="card grow"><span class="tag">FIDELITY</span><h3>Does the answer stay within the retrieved context?</h3><p>Penalises hallucinations. If the model invents facts not in the chunks, this score drops.</p></div>
+      <div class="card grow"><span class="tag">ANSWER RELEVANCE</span><h3>Does the answer address the question?</h3><p>Cosine similarity between the question embedding and the answer embedding.</p></div>
+      <div class="card grow"><span class="tag">CONTEXT RECALL</span><h3>Did retrieval surface the right passages?</h3><p>Max cosine similarity between the answer and any single retrieved chunk.</p></div>
+    </div>
+    <div class="callout" style="font-size:18px"><b>Advanced:</b> the RAGAS library automates all three metrics using an LLM as judge. Try it after the exercise.</div>
+  </div>
+</section>
+
+<!-- ===================== 11b. RAG TRIAD ===================== -->
+<section class="slide diagram" data-topic="Evaluation" data-title="The RAG Evaluation Triangle">
+  <h2>The RAG Evaluation Triangle</h2>
+  <p class="sub">Each metric checks one relationship. Click an edge to see what a low score tells you.</p>
+  <div class="body" style="flex-direction:row;gap:26px;align-items:center">
+    <svg id="triSvg" viewBox="0 0 560 470" style="width:560px;flex:none"></svg>
+    <div class="grow panel" id="triPanel" style="font-size:17px;line-height:1.45"></div>
+  </div>
+</section>
+
+<!-- ===================== 12. HANDS-ON ===================== -->
+<section class="slide" data-topic="Hands-on Exercise" data-src="12" data-title="Hands-on Exercise">
+  <h2>Hands-on Exercise (~30 min)</h2>
+  <p class="sub">What you will build step by step</p>
+  <div class="body" style="gap:16px">
+    <table class="t" style="font-size:17px">
+      <tr><td style="width:46px"><div class="steps"><div class="n">1</div></div></td><td><b>Install libraries</b></td><td>LangChain, FAISS, HuggingFace, bitsandbytes</td><td style="text-align:right;color:var(--teal);font-weight:700">~3 min</td></tr>
+      <tr><td><div class="steps"><div class="n">2</div></div></td><td><b>Generate health PDFs</b></td><td>4 documents: diabetes, hypertension, CVD, obesity</td><td style="text-align:right;color:var(--teal);font-weight:700">~2 min</td></tr>
+      <tr><td><div class="steps"><div class="n">3</div></div></td><td><b>Chunk documents</b></td><td>500 chars / 50 overlap — RecursiveCharacterSplitter</td><td style="text-align:right;color:var(--teal);font-weight:700">~1 min</td></tr>
+      <tr><td><div class="steps"><div class="n">4</div></div></td><td><b>Build vector store</b></td><td>Embed with all-MiniLM-L6-v2, index with FAISS</td><td style="text-align:right;color:var(--teal);font-weight:700">~2 min</td></tr>
+      <tr><td><div class="steps"><div class="n">5</div></div></td><td><b>Load Mistral 7B</b></td><td>4-bit NF4 quantization, fits in ~5 GB VRAM</td><td style="text-align:right;color:var(--teal);font-weight:700">~6 min</td></tr>
+      <tr><td><div class="steps"><div class="n">6</div></div></td><td><b>Ask questions</b></td><td>Test the RAG chain on 3 medical questions</td><td style="text-align:right;color:var(--teal);font-weight:700">~5 min</td></tr>
+      <tr><td><div class="steps"><div class="n">7</div></div></td><td><b>Evaluate quality</b></td><td>Faithfulness, relevance, recall + bar chart</td><td style="text-align:right;color:var(--teal);font-weight:700">~5 min</td></tr>
+    </table>
+    <div>
+      <div class="timeline">
+        <div style="flex:3;background:#065A82">1</div><div style="flex:2;background:#1C7293">2</div><div style="flex:1;background:#00B4D8">3</div><div style="flex:2;background:#1C7293">4</div>
+        <div style="flex:6;background:#020938">5 · Load Mistral</div><div style="flex:5;background:#065A82">6 · Ask</div><div style="flex:5;background:#1C7293">7 · Evaluate</div><div style="flex:6;background:#CCDDEE;color:#020938">buffer</div>
+      </div>
+      <p class="note" style="margin:6px 0 0">Time budget for the 30-minute session. Loading the model is the slowest step, so start it early.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 13. TAKEAWAYS ===================== -->
+<section class="slide" data-topic="Wrap-up" data-src="13" data-title="Key Takeaways">
+  <h2>Key Takeaways</h2>
+  <div class="body">
+    <div class="grid3" style="grid-template-columns:repeat(6,1fr)">
+      <div class="card" style="grid-column:span 2"><span class="tag">LLMs</span><h3>LLMs have fixed knowledge</h3><p>RAG extends any model to answer questions about documents it never saw during training.</p></div>
+      <div class="card" style="grid-column:span 2"><span class="tag">CHUNK</span><h3>Chunk wisely</h3><p>Chunk size and overlap directly affect retrieval quality — experiment with both.</p></div>
+      <div class="card" style="grid-column:span 2"><span class="tag">EMBED</span><h3>Embeddings are the bridge</h3><p>They let us compare meaning mathematically, not just keyword matching.</p></div>
+      <div class="card" style="grid-column:2 / span 2"><span class="tag">QUANT</span><h3>Quantization makes it practical</h3><p>4-bit NF4 shrinks a 28 GB model to ~4 GB with negligible quality loss.</p></div>
+      <div class="card" style="grid-column:span 2"><span class="tag">EVAL</span><h3>Always evaluate</h3><p>Faithfulness, relevance, and context recall are your three core RAG health metrics.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 14. RESOURCES ===================== -->
+<section class="slide" data-topic="Wrap-up" data-src="14" data-title="Further Reading & Resources">
+  <h2>Further Reading &amp; Resources</h2>
+  <div class="body">
+    <div class="grid3">
+      <a class="res-card" href="https://python.langchain.com" target="_blank" rel="noopener"><b>LangChain</b><div class="u">python.langchain.com</div><span>Chains, retrievers, prompts reference</span></a>
+      <a class="res-card" href="https://github.com/explodinggradients/ragas" target="_blank" rel="noopener"><b>RAGAS</b><div class="u">github.com/explodinggradients/ragas</div><span>Production RAG evaluation framework</span></a>
+      <a class="res-card" href="https://mistral.ai" target="_blank" rel="noopener"><b>Mistral AI</b><div class="u">mistral.ai</div><span>Mistral 7B paper and model card</span></a>
+      <a class="res-card" href="https://github.com/facebookresearch/faiss" target="_blank" rel="noopener"><b>FAISS</b><div class="u">github.com/facebookresearch/faiss</div><span>Vector search library source + docs</span></a>
+      <a class="res-card" href="https://github.com/TimDettmers/bitsandbytes" target="_blank" rel="noopener"><b>BitsAndBytes</b><div class="u">github.com/TimDettmers/bitsandbytes</div><span>Quantization library used in exercise</span></a>
+      <a class="res-card" href="https://sbert.net" target="_blank" rel="noopener"><b>Sentence Transformers</b><div class="u">sbert.net</div><span>Docs for the embedding model used</span></a>
+    </div>
+    <a class="repo" href="https://github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks" target="_blank" rel="noopener">
+      <span class="tag" style="background:var(--cyan);color:var(--navy)">NOTEBOOKS</span>
+      <span>Workshop notebooks:</span>
+      <code>github.com/jmnlcruz/CUT_Workshop/tree/main/notebooks</code>
+    </a>
+    <div class="callout" style="text-align:center;font-family:var(--serif);font-size:26px">Good luck with the exercise!</div>
+  </div>
+</section>
+
+</div></div>
+
+<div id="progress"></div>
+<nav id="menu" aria-label="Topics"></nav>
+<div id="nav">
+  <button id="bMenu" title="Topics (T)">☰ <span class="hide-sm">Topics</span></button>
+  <button id="bPrevT" class="hide-sm" title="Previous topic (↑)">⏮</button>
+  <div class="center">
+    <button id="bPrev" title="Previous slide (←)">◀ <span class="hide-sm">Prev</span></button>
+    <span id="topicLabel"></span>
+    <span id="counter"></span>
+    <button id="bNext" class="primary" title="Next slide (→)"><span class="hide-sm">Next</span> ▶</button>
+  </div>
+  <button id="bNextT" class="hide-sm" title="Next topic (↓)">⏭</button>
+  <button id="bFull" title="Fullscreen (F)">⛶</button>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = "http://www.w3.org/2000/svg";
+function S(tag, attrs = {}, parent, text) {
+  const el = document.createElementNS(NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  if (text != null) el.textContent = text;
+  if (parent) parent.appendChild(el);
+  return el;
+}
+function arrowDefs(svg, id, color) {
+  const defs = S("defs", {}, svg);
+  const m = S("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  S("path", { d: "M0 0L10 5L0 10z", fill: color }, m);
+}
+
+/* ============================== DECK NAV ============================== */
+const deck = $("#deck"), slides = $$(".slide");
+const topics = [];
+slides.forEach((s, i) => {
+  const t = s.dataset.topic;
+  if (!topics.includes(t)) topics.push(t);
+  const f = document.createElement("div");
+  f.className = "foot";
+  f.textContent = s.dataset.src ? `PPTX slide ${s.dataset.src}` : "Additional diagram";
+  s.appendChild(f);
+  if (s.classList.contains("diagram")) {
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "INTERACTIVE DIAGRAM";
+    s.insertBefore(b, s.firstElementChild);
+  }
+});
+const firstOfTopic = t => slides.findIndex(s => s.dataset.topic === t);
+
+const menu = $("#menu");
+topics.forEach((t, ti) => {
+  const h = document.createElement("h5");
+  h.textContent = t; menu.appendChild(h);
+  slides.forEach((s, i) => {
+    if (s.dataset.topic !== t) return;
+    const a = document.createElement("a");
+    a.dataset.i = i;
+    a.innerHTML = `<i>${i + 1}</i><span></span>${s.classList.contains("diagram") ? "<em>DIAGRAM</em>" : ""}`;
+    a.querySelector("span").textContent = s.dataset.title;
+    a.onclick = () => { go(i); menu.classList.remove("open"); };
+    menu.appendChild(a);
+  });
+});
+
+const hooks = {};
+let cur = -1;
+function go(i) {
+  i = Math.max(0, Math.min(slides.length - 1, i));
+  if (i === cur) return;
+  slides.forEach((s, k) => { s.classList.toggle("before", k < i); });
+  if (cur >= 0) slides[cur].classList.remove("active", "play");
+  const s = slides[i];
+  s.classList.add("active");
+  cur = i;
+  if (s.hasAttribute("data-replay")) { void s.offsetWidth; s.classList.add("play"); }
+  if (s.id && hooks[s.id]) hooks[s.id]();
+  $("#counter").textContent = `${i + 1} / ${slides.length}`;
+  $("#topicLabel").textContent = s.dataset.topic;
+  $("#progress").style.width = `${((i + 1) / slides.length) * 100}%`;
+  $("#bPrev").disabled = i === 0;
+  $("#bNext").disabled = i === slides.length - 1;
+  $$("#menu a").forEach(a => a.classList.toggle("cur", +a.dataset.i === i));
+  history.replaceState(null, "", "#" + (i + 1));
+}
+function topicStep(dir) {
+  const ti = topics.indexOf(slides[cur].dataset.topic);
+  if (dir < 0 && cur !== firstOfTopic(topics[ti])) return go(firstOfTopic(topics[ti]));
+  const nt = topics[Math.max(0, Math.min(topics.length - 1, ti + dir))];
+  go(firstOfTopic(nt));
+}
+$("#bPrev").onclick = () => go(cur - 1);
+$("#bNext").onclick = () => go(cur + 1);
+$("#bPrevT").onclick = () => topicStep(-1);
+$("#bNextT").onclick = () => topicStep(1);
+$("#bMenu").onclick = () => menu.classList.toggle("open");
+$("#bFull").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+$$("[data-goto]").forEach(el => el.onclick = () => go(firstOfTopic(el.dataset.goto)));
+$$('[data-action="replay"]').forEach(b => b.onclick = () => { const s = slides[cur]; s.classList.remove("play"); void s.offsetWidth; s.classList.add("play"); });
+
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if ((tag === "INPUT" && e.target.type !== "checkbox") || tag === "TEXTAREA") return;
+  switch (e.key) {
+    case "ArrowRight": case "PageDown": case " ": go(cur + 1); break;
+    case "ArrowLeft": case "PageUp": go(cur - 1); break;
+    case "ArrowDown": topicStep(1); break;
+    case "ArrowUp": topicStep(-1); break;
+    case "Home": go(0); break;
+    case "End": go(slides.length - 1); break;
+    case "t": case "T": menu.classList.toggle("open"); break;
+    case "f": case "F": $("#bFull").click(); break;
+    case "Escape": menu.classList.remove("open"); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+let tx = null;
+$("#viewport").addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, { passive: true });
+$("#viewport").addEventListener("touchend", e => {
+  if (tx == null) return;
+  const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 60) go(cur + (dx < 0 ? 1 : -1));
+});
+
+function fit() {
+  const vp = $("#viewport");
+  const pad = 16;
+  const sc = Math.min((vp.clientWidth - pad * 2) / 1280, (vp.clientHeight - pad * 2) / 720);
+  deck.style.transform = `scale(${sc})`;
+  deck.style.left = (vp.clientWidth - 1280 * sc) / 2 + "px";
+  deck.style.top = (vp.clientHeight - 720 * sc) / 2 + "px";
+}
+window.addEventListener("resize", fit);
+
+/* ============================== ARCHITECTURE ============================== */
+(() => {
+  const svg = $("#archSvg");
+  arrowDefs(svg, "aA", "#1C7293");
+  arrowDefs(svg, "aC", "#00B4D8");
+  const L = 80, R = 712, W = 360, H = 60, ys = [48, 140, 232, 324];
+  S("text", { x: L + W / 2, y: 26, "text-anchor": "middle", "font-size": 16, "font-weight": 700, fill: "#065A82", "letter-spacing": "2" }, svg, "INDEXING  (done once)");
+  S("text", { x: R + W / 2, y: 26, "text-anchor": "middle", "font-size": 16, "font-weight": 700, fill: "#065A82", "letter-spacing": "2" }, svg, "QUERYING  (every question)");
+  S("rect", { x: L - 20, y: 36, width: W + 40, height: 360, rx: 14, fill: "none", stroke: "#CCDDEE", "stroke-dasharray": "6 5" }, svg);
+  S("rect", { x: R - 20, y: 36, width: W + 40, height: 360, rx: 14, fill: "none", stroke: "#CCDDEE", "stroke-dasharray": "6 5" }, svg);
+
+  const boxes = [
+    ["pdf", L, 0, "PDF Documents", "4 health PDFs", "Load the PDF documents: your private knowledge base (diabetes, hypertension, CVD, obesity)."],
+    ["chunk", L, 1, "Chunking", "500 chars · 50 overlap", "Split each document into ~500-character chunks with 50 characters of overlap."],
+    ["embed", L, 2, "Embeddings", "all-MiniLM-L6-v2 → 384-d vector", "Turn every chunk into a 384-dimensional vector with all-MiniLM-L6-v2."],
+    ["store", L, 3, "Vector Store", "FAISS index (vectors + text)", "Store vectors + original text in a FAISS index. Indexing is done once, offline."],
+    ["query", R, 0, "User Query", "natural-language question", "At query time, a user asks a question in natural language."],
+    ["qembed", R, 1, "Query Embedding", "same model → same vector space", "Embed the question with the SAME model, so it lives in the same vector space as the chunks."],
+    ["topk", R, 2, "Top-K Retrieval", "k most similar chunks", "FAISS returns the K chunks whose vectors are closest (cosine similarity) to the query vector."],
+    ["llm", R, 3, "LLM Generation", "Mistral 7B · grounded answer", "Mistral 7B gets the question + retrieved chunks in its prompt and writes a grounded answer."]
+  ];
+  // links (drawn first so boxes sit on top)
+  const links = S("g", {}, svg);
+  boxes.forEach(([id, x, r]) => { if (r < 3) S("line", { x1: x + W / 2, y1: ys[r] + H, x2: x + W / 2, y2: ys[r + 1] - 2, stroke: "#1C7293", "stroke-width": 2.5, "marker-end": "url(#aA)", "data-for": boxes.find(b => b[1] === x && b[2] === r + 1)[0] }, links); });
+  S("path", { d: `M${L + W} ${ys[2] + H / 2} C 576 ${ys[2] + H / 2}, 576 ${ys[1] + H / 2}, ${R} ${ys[1] + H / 2}`, fill: "none", stroke: "#94A3B8", "stroke-width": 2, "stroke-dasharray": "6 5", "data-for": "qembed" }, links);
+  S("text", { x: 576, y: ys[1] + H / 2 + 50, "text-anchor": "middle", "font-size": 14, fill: "#64748B" }, links, "same embedding model");
+  S("path", { d: `M${L + W} ${ys[3] + H / 2} C 576 ${ys[3] + H / 2}, 576 ${ys[2] + H / 2}, ${R - 2} ${ys[2] + H / 2}`, fill: "none", stroke: "#00B4D8", "stroke-width": 3, "marker-start": "url(#aC)", "marker-end": "url(#aC)", "data-for": "topk" }, links);
+  S("text", { x: 576, y: ys[3] + H / 2 + 8, "text-anchor": "middle", "font-size": 14, fill: "#065A82", "font-weight": 700 }, links, "similarity search");
+
+  const g = {};
+  boxes.forEach(([id, x, r, label, sub], k) => {
+    const grp = S("g", { "data-id": id, style: "transition:opacity .3s" }, svg);
+    const dark = id === "store" || id === "llm";
+    S("rect", { x, y: ys[r], width: W, height: H, rx: 10, fill: dark ? "#020938" : "#E8F4F8", stroke: dark ? "#020938" : "#CCDDEE", "stroke-width": 2, class: "bx" }, grp);
+    S("circle", { cx: x + 32, cy: ys[r] + H / 2, r: 16, fill: dark ? "#00B4D8" : "#065A82" }, grp);
+    S("text", { x: x + 32, y: ys[r] + H / 2 + 6, "text-anchor": "middle", fill: dark ? "#020938" : "#fff", "font-size": 16, "font-weight": 700 }, grp, k + 1);
+    S("text", { x: x + 62, y: ys[r] + 26, "font-size": 19, "font-weight": 700, fill: dark ? "#fff" : "#020938", "font-family": "Georgia, serif" }, grp, label);
+    S("text", { x: x + 62, y: ys[r] + 47, "font-size": 14, fill: dark ? "#A0C8E0" : "#64748B" }, grp, sub);
+    g[id] = grp;
+  });
+
+  let step = 0; // 0 = overview
+  function render() {
+    boxes.forEach(([id], k) => {
+      const on = step === 0 || k < step;
+      g[id].style.opacity = on ? 1 : 0.18;
+      g[id].querySelector(".bx").setAttribute("stroke", k === step - 1 ? "#F7C548" : (id === "store" || id === "llm" ? "#020938" : "#CCDDEE"));
+      g[id].querySelector(".bx").setAttribute("stroke-width", k === step - 1 ? 5 : 2);
+    });
+    [...links.children].forEach(el => {
+      const f = el.getAttribute("data-for");
+      const idx = f ? boxes.findIndex(b => b[0] === f) : 7;
+      el.style.opacity = step === 0 || idx < step ? 1 : 0.12;
+      el.style.transition = "opacity .3s";
+    });
+    $("#archText").innerHTML = step === 0
+      ? "<b>Overview.</b> Left: the index is built once. Right: each question is answered using that index. Press <b>Step ▶</b> to walk through it."
+      : `<b>Step ${step}/8 · ${boxes[step - 1][3]}.</b> ${boxes[step - 1][5]}`;
+    $("#archPrev").disabled = step === 0;
+    $("#archNext").disabled = step === 8;
+  }
+  $("#archNext").onclick = () => { step = Math.min(8, step + 1); render(); };
+  $("#archPrev").onclick = () => { step = Math.max(0, step - 1); render(); };
+  $("#archAll").onclick = () => { step = 0; render(); };
+  hooks["s-arch"] = () => { step = 0; render(); };
+  render();
+})();
+
+/* ============================== CHUNKING PLAYGROUND ============================== */
+(() => {
+  const TEXT = "Type 2 diabetes is a chronic condition in which the body does not use insulin effectively. Over time, high blood glucose can damage blood vessels, nerves, kidneys and eyes. Common risk factors include excess body weight, physical inactivity, an unhealthy diet and a family history of the disease. Hypertension often appears together with diabetes and further increases cardiovascular risk. Regular screening helps detect elevated glucose early, when lifestyle changes are most effective. Recommended measures include a balanced diet, regular moderate physical activity and, when needed, medication prescribed by a physician. Patients should monitor their blood pressure and glucose levels and attend periodic check-ups with their care team.";
+  const size = $("#chSize"), ov = $("#chOv"), word = $("#chWord");
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  function split(n, o, words) {
+    const out = []; let start = 0;
+    while (start < TEXT.length) {
+      let end = Math.min(TEXT.length, start + n);
+      if (words && end < TEXT.length) {
+        const sp = TEXT.lastIndexOf(" ", end);
+        if (sp > start + n / 2) end = sp;
+      }
+      out.push([start, end]);
+      if (end >= TEXT.length) break;
+      let next = end - o;
+      if (words && o > 0) { const sp = TEXT.indexOf(" ", next); if (sp !== -1 && sp < end) next = sp + 1; }
+      start = Math.max(next, start + 1);
+    }
+    return out;
+  }
+  function render() {
+    const n = +size.value;
+    let o = +ov.value;
+    if (o > n / 2) { o = Math.floor(n / 2 / 5) * 5; ov.value = o; }
+    $("#chSizeV").textContent = n; $("#chOvV").textContent = o;
+    const ch = split(n, o, word.checked);
+    const cov = new Array(TEXT.length).fill(0), own = new Array(TEXT.length).fill(0);
+    ch.forEach(([a, b], k) => { for (let i = a; i < b; i++) { if (!cov[i]) own[i] = k; cov[i]++; } });
+    let html = "", curCls = null, buf = "";
+    for (let i = 0; i < TEXT.length; i++) {
+      const cls = cov[i] > 1 ? "ov" : cov[i] ? "c" + (own[i] % 4) : "";
+      if (cls !== curCls) { if (buf) html += `<span class="${curCls}">${esc(buf)}</span>`; buf = ""; curCls = cls; }
+      buf += TEXT[i];
+    }
+    html += `<span class="${curCls}">${esc(buf)}</span>`;
+    $("#chText").innerHTML = html;
+    const dup = cov.reduce((s, c) => s + Math.max(0, c - 1), 0);
+    const avg = Math.round(ch.reduce((s, [a, b]) => s + b - a, 0) / ch.length);
+    $("#chStats").innerHTML = `<div><b>${ch.length}</b>chunks</div><div><b>${avg}</b>avg chars</div><div><b>${Math.round(dup / TEXT.length * 100)}%</b>duplicated</div>`;
+    $("#chList").innerHTML = ch.map(([a, b], k) => `<span class="c${k % 4}">#${k + 1} ${a}–${b}</span>`).join("");
+  }
+  [size, ov, word].forEach(el => el.addEventListener("input", render));
+  render();
+})();
+
+/* ============================== EMBEDDING SPACE ============================== */
+(() => {
+  const svg = $("#embSvg");
+  arrowDefs(svg, "eG", "#94A3B8"); arrowDefs(svg, "eT", "#00B4D8");
+  const O = [300, 440];
+  const pts = [
+    // label, angle, radius, cluster, label dx, dy, anchor
+    ["heart attack symptoms", 70, 300, 0, 10, -6, "start"],
+    ["myocardial infarction", 78, 230, 0, -10, 4, "end"],
+    ["chest pain", 60, 230, 0, 12, 6, "start"],
+    ["cardiac arrest", 88, 320, 0, -10, -6, "end"],
+    ["diabetes", 36, 270, 1, 12, 5, "start"],
+    ["high blood sugar", 26, 200, 1, 10, 18, "start"],
+    ["insulin resistance", 44, 310, 1, 0, -14, "middle"],
+    ["spaghetti carbonara", 150, 270, 2, -2, -14, "start"],
+    ["tomato sauce", 138, 300, 2, -6, -14, "start"],
+    ["pasta recipe", 160, 220, 2, 0, 22, "start"]
+  ];
+  const col = ["#D1495B", "#065A82", "#B7791F"];
+  const cname = ["cardiology", "metabolic", "food"];
+  const P = p => [O[0] + p[2] * Math.cos(p[1] * Math.PI / 180), O[1] - p[2] * Math.sin(p[1] * Math.PI / 180)];
+  // axes
+  S("line", { x1: 10, y1: O[1], x2: 630, y2: O[1], stroke: "#CBD5E1" }, svg);
+  S("line", { x1: O[0], y1: O[1], x2: O[0], y2: 20, stroke: "#CBD5E1" }, svg);
+  S("text", { x: 625, y: O[1] - 6, "text-anchor": "end", "font-size": 12, fill: "#94A3B8" }, svg, "dim 1");
+  S("text", { x: O[0] + 6, y: 30, "font-size": 12, fill: "#94A3B8" }, svg, "dim 2");
+  const arc = S("path", { fill: "rgba(247,197,72,.35)", stroke: "#F7C548", "stroke-width": 2 }, svg);
+  const arcT = S("text", { "font-size": 15, "font-weight": 700, fill: "#020938" }, svg);
+  const vecs = S("g", {}, svg), dots = S("g", {}, svg);
+  let sel = 0, hov = null;
+  pts.forEach((p, i) => {
+    const [x, y] = P(p);
+    S("line", { x1: O[0], y1: O[1], x2: x, y2: y, stroke: "#CBD5E1", "stroke-width": 1.5, "marker-end": "url(#eG)" }, vecs);
+    const g = S("g", { style: "cursor:pointer" }, dots);
+    S("circle", { cx: x, cy: y, r: 9, fill: col[p[3]], stroke: "#fff", "stroke-width": 2 }, g);
+    S("text", { x: x + p[4], y: y + p[5], "text-anchor": p[6], "font-size": 15, fill: "#020938", "font-weight": 600 }, g, p[0]);
+    g.onclick = () => { sel = i; hov = null; render(); };
+    g.onmouseenter = () => { hov = i; render(); };
+    g.onmouseleave = () => { hov = null; render(); };
+  });
+  S("circle", { cx: O[0], cy: O[1], r: 4, fill: "#020938" }, svg);
+  const legend = S("g", {}, svg);
+  cname.forEach((c, k) => { S("circle", { cx: 24, cy: 24 + k * 22, r: 7, fill: col[k] }, legend); S("text", { x: 38, y: 29 + k * 22, "font-size": 14, fill: "#334155" }, legend, c); });
+  const cos = (a, b) => Math.cos((pts[a][1] - pts[b][1]) * Math.PI / 180);
+  function render() {
+    [...vecs.children].forEach((l, i) => {
+      const s = i === sel;
+      l.setAttribute("stroke", s ? "#00B4D8" : i === hov ? "#F7C548" : "#CBD5E1");
+      l.setAttribute("stroke-width", s ? 4 : i === hov ? 3 : 1.5);
+      l.setAttribute("marker-end", s ? "url(#eT)" : "url(#eG)");
+    });
+    [...dots.children].forEach((g, i) => g.querySelector("circle").setAttribute("r", i === sel ? 12 : 9));
+    if (hov != null && hov !== sel) {
+      const a1 = pts[sel][1], a2 = pts[hov][1], r = 70;
+      const lo = Math.min(a1, a2) * Math.PI / 180, hi = Math.max(a1, a2) * Math.PI / 180;
+      arc.setAttribute("d", `M${O[0]} ${O[1]} L${O[0] + r * Math.cos(lo)} ${O[1] - r * Math.sin(lo)} A${r} ${r} 0 0 0 ${O[0] + r * Math.cos(hi)} ${O[1] - r * Math.sin(hi)} Z`);
+      const mid = (lo + hi) / 2;
+      arcT.setAttribute("x", O[0] + 95 * Math.cos(mid)); arcT.setAttribute("y", O[1] - 95 * Math.sin(mid));
+      arcT.setAttribute("text-anchor", "middle");
+      arcT.textContent = `θ=${Math.abs(a1 - a2)}° cos=${cos(sel, hov).toFixed(2)}`;
+    } else { arc.setAttribute("d", ""); arcT.textContent = ""; }
+    $("#embQ").textContent = `"${pts[sel][0]}"`;
+    const rows = pts.map((p, i) => [i, cos(sel, i)]).filter(r => r[0] !== sel).sort((a, b) => b[1] - a[1]);
+    $("#embList").innerHTML = rows.map(([i, c]) => {
+      const left = c >= 0 ? 50 : 50 + c * 50, w = Math.abs(c) * 50;
+      return `<div class="simrow"><span style="color:${col[pts[i][3]]};font-weight:600">${pts[i][0]}</span><div class="bar"><i style="left:${left}%;width:${w}%;background:${c > .7 ? "#2A9D8F" : c > 0.3 ? "#00B4D8" : "#D1495B"}"></i><i style="left:50%;width:1px;background:#94A3B8"></i></div><span class="v">${c.toFixed(2)}</span></div>`;
+    }).join("");
+  }
+  render();
+})();
+
+/* ============================== TOP-K SEARCH ============================== */
+(() => {
+  const svg = $("#knnSvg");
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const gauss = () => { let u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const docs = [
+    { name: "diabetes.pdf", c: "#065A82", cx: 150, cy: 120, t: ["Risk factors for type 2 diabetes", "Insulin resistance explained", "HbA1c and glucose testing", "Carbohydrates and diet", "Diabetes complications overview", "Exercise and blood glucose", "Screening recommendations"] },
+    { name: "hypertension.pdf", c: "#D1495B", cx: 450, cy: 115, t: ["Defining high blood pressure", "Measuring blood pressure at home", "Salt intake and hypertension", "Antihypertensive medication classes", "Lifestyle changes for blood pressure", "Hypertension and kidney damage", "When to see a doctor"] },
+    { name: "cvd.pdf", c: "#B7791F", cx: 440, cy: 320, t: ["Coronary artery disease basics", "Heart attack warning signs", "Cholesterol and plaque", "Stroke risk factors", "Cardiac rehabilitation", "Smoking and the heart", "Obesity as a cardiac risk factor"] },
+    { name: "obesity.pdf", c: "#2A9D8F", cx: 160, cy: 320, t: ["Body mass index (BMI)", "Causes of obesity", "Obesity and insulin resistance", "Physical activity guidelines", "Healthy weight-loss strategies", "Obesity and heart strain", "Childhood obesity"] }
+  ];
+  const chunks = [];
+  docs.forEach((d, di) => d.t.forEach((t, k) => {
+    let x = d.cx + gauss() * 45, y = d.cy + gauss() * 38;
+    // a few deliberately "bridging" chunks
+    if (t === "Obesity as a cardiac risk factor") { x = 330; y = 335; }
+    if (t === "Obesity and heart strain") { x = 270; y = 310; }
+    if (t === "Obesity and insulin resistance") { x = 185; y = 220; }
+    if (t === "Hypertension and kidney damage") { x = 360; y = 175; }
+    chunks.push({ x: Math.max(20, Math.min(580, x)), y: Math.max(20, Math.min(420, y)), d: di, t });
+  }));
+  const qs = [
+    { q: "What are the risk factors for diabetes?", x: 170, y: 150 },
+    { q: "How is high blood pressure treated?", x: 445, y: 140 },
+    { q: "How does obesity affect the heart?", x: 300, y: 320 }
+  ];
+  // doc labels
+  docs.forEach(d => S("text", { x: d.cx, y: d.cy < 200 ? d.cy - 82 : d.cy + 98, "text-anchor": "middle", "font-size": 14, "font-weight": 700, fill: d.c, opacity: .8 }, svg, d.name));
+  const circ = S("circle", { fill: "rgba(0,180,216,.08)", stroke: "#00B4D8", "stroke-width": 2, "stroke-dasharray": "6 4" }, svg);
+  const lines = S("g", {}, svg);
+  const dotsG = S("g", {}, svg);
+  chunks.forEach(c => S("circle", { cx: c.x, cy: c.y, r: 7, fill: docs[c.d].c, stroke: "#fff", "stroke-width": 1.5 }, dotsG));
+  const star = S("path", { fill: "#F7C548", stroke: "#020938", "stroke-width": 1.5 }, svg);
+  const starPath = (x, y, r = 14) => { let d = ""; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; d += (i ? "L" : "M") + (x + rr * Math.cos(a)).toFixed(1) + " " + (y + rr * Math.sin(a)).toFixed(1); } return d + "Z"; };
+  let qi = 0;
+  const qbox = $("#knnQs");
+  qs.forEach((q, i) => { const b = document.createElement("button"); b.className = "btn"; b.style.textAlign = "left"; b.textContent = "★ " + q.q; b.onclick = () => { qi = i; render(); }; qbox.appendChild(b); });
+  const kIn = $("#knnK");
+  kIn.oninput = render;
+  function render() {
+    const q = qs[qi], K = +kIn.value;
+    $("#knnKV").textContent = K;
+    [...qbox.children].forEach((b, i) => b.classList.toggle("sel", i === qi));
+    const ranked = chunks.map((c, i) => ({ i, dist: Math.hypot(c.x - q.x, c.y - q.y) })).sort((a, b) => a.dist - b.dist);
+    const top = ranked.slice(0, K);
+    star.setAttribute("d", starPath(q.x, q.y));
+    circ.setAttribute("cx", q.x); circ.setAttribute("cy", q.y); circ.setAttribute("r", top[K - 1].dist + 10);
+    lines.innerHTML = "";
+    top.forEach(t => S("line", { x1: q.x, y1: q.y, x2: chunks[t.i].x, y2: chunks[t.i].y, stroke: "#020938", "stroke-width": 1.5, opacity: .6 }, lines));
+    const topSet = new Set(top.map(t => t.i));
+    [...dotsG.children].forEach((c, i) => { c.setAttribute("r", topSet.has(i) ? 10 : 6); c.setAttribute("opacity", topSet.has(i) ? 1 : .35); });
+    $("#knnRes").innerHTML = top.map((t, r) => { const c = chunks[t.i]; return `<div><span class="dot" style="background:${docs[c.d].c}"></span><span><b>#${r + 1}</b> ${c.t} <span style="color:#64748B">· ${docs[c.d].name}</span></span></div>`; }).join("");
+  }
+  render();
+})();
+
+/* ============================== NF4 ============================== */
+(() => {
+  const NF4 = [-1.0, -0.6961928, -0.5250731, -0.3949175, -0.2844414, -0.1847734, -0.0910500, 0.0, 0.0795803, 0.1609302, 0.2461123, 0.3379152, 0.4407098, 0.5626170, 0.7229568, 1.0];
+  const svg = $("#nf4Svg");
+  const X = v => 50 + (v + 1) / 2 * 1000, BASE = 150;
+  // bell curve
+  let d = "";
+  for (let v = -1; v <= 1.0001; v += 0.01) { const y = BASE - 110 * Math.exp(-(v * v) / (2 * 0.16)); d += (d ? "L" : "M") + X(v).toFixed(1) + " " + y.toFixed(1); }
+  S("path", { d: d + `L${X(1)} ${BASE}L${X(-1)} ${BASE}Z`, fill: "#E8F4F8", stroke: "#1C7293", "stroke-width": 2 }, svg);
+  S("text", { x: X(0.36), y: 52, "font-size": 13, fill: "#1C7293" }, svg, "typical weight distribution (≈ normal)");
+  S("line", { x1: X(-1), y1: BASE, x2: X(1), y2: BASE, stroke: "#020938", "stroke-width": 2 }, svg);
+  NF4.forEach((v, i) => {
+    S("line", { x1: X(v), y1: BASE - 8, x2: X(v), y2: BASE + 8, stroke: "#065A82", "stroke-width": 2 }, svg);
+    S("text", { x: X(v), y: BASE + 24 + (i % 2) * 14, "text-anchor": "middle", "font-size": 11, fill: "#065A82", "font-family": "Consolas, monospace" }, svg, i.toString(2).padStart(4, "0"));
+  });
+  [-1, -0.5, 0, 0.5, 1].forEach(v => S("text", { x: X(v), y: BASE - 14, "text-anchor": "middle", "font-size": 12, fill: "#94A3B8" }, svg, v));
+  S("text", { x: 6, y: BASE + 30, "font-size": 12, fill: "#64748B" }, svg, "code");
+  const errLine = S("line", { stroke: "#D1495B", "stroke-width": 3 }, svg);
+  const mW = S("path", { fill: "#D1495B" }, svg);
+  const mQ = S("circle", { r: 8, fill: "#00B4D8", stroke: "#020938", "stroke-width": 2 }, svg);
+  const lab = S("text", { "font-size": 14, "font-weight": 700, fill: "#020938", "text-anchor": "middle" }, svg);
+
+  let w = [], sel = 0;
+  function newBlock() {
+    w = Array.from({ length: 8 }, () => { let u = Math.random() || 1e-9, v = Math.random(); return +(0.03 * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)).toFixed(4); });
+    // start on a mid-sized weight (not the absmax one, which always maps to ±1)
+    const order = w.map((x, i) => i).sort((a, b) => Math.abs(w[a]) - Math.abs(w[b]));
+    sel = order[4]; render();
+  }
+  function render() {
+    const scale = Math.max(...w.map(Math.abs));
+    const rows = w.map(x => {
+      const n = x / scale;
+      let q = 0; NF4.forEach((v, i) => { if (Math.abs(v - n) < Math.abs(NF4[q] - n)) q = i; });
+      return { x, n, q, rec: NF4[q] * scale };
+    });
+    const f = (v, p = 4) => (v >= 0 ? "+" : "") + v.toFixed(p);
+    const tr = (h, fn) => `<tr><th>${h}</th>${rows.map((r, i) => `<td data-i="${i}" class="${i === sel ? "selc" : ""}">${fn(r)}</td>`).join("")}</tr>`;
+    $("#nf4Tab").innerHTML =
+      tr("weight (fp16)", r => f(r.x)) +
+      tr(`÷ absmax (${scale.toFixed(4)})`, r => f(r.n, 3)) +
+      tr("nearest NF4 level", r => f(NF4[r.q], 3)) +
+      tr("stored 4-bit code", r => `<b style="color:#065A82">${r.q.toString(2).padStart(4, "0")}</b>`) +
+      tr("dequantized", r => f(r.rec)) +
+      tr("error", r => `<span style="color:#D1495B">${Math.abs(r.x - r.rec).toFixed(4)}</span>`);
+    $$("#nf4Tab td").forEach(td => td.onclick = () => { sel = +td.dataset.i; render(); });
+    const r = rows[sel], xw = X(r.n), xq = X(NF4[r.q]);
+    mW.setAttribute("d", `M${xw} ${BASE - 4}l-8 -16h16z`);
+    mQ.setAttribute("cx", xq); mQ.setAttribute("cy", BASE);
+    errLine.setAttribute("x1", xw); errLine.setAttribute("x2", xq); errLine.setAttribute("y1", BASE); errLine.setAttribute("y2", BASE);
+    lab.setAttribute("x", Math.max(130, Math.min(970, xw))); lab.setAttribute("y", BASE - 26);
+    lab.textContent = `w=${f(r.n, 3)} → level ${r.q.toString(2).padStart(4, "0")} (${f(NF4[r.q], 3)})`;
+  }
+  $("#nf4New").onclick = newBlock;
+  newBlock();
+})();
+
+/* ============================== LCEL FLOW ============================== */
+(() => {
+  const svg = $("#lcelSvg");
+  arrowDefs(svg, "lA", "#1C7293");
+  const nodes = {
+    in: [10, 80, 120, "User query", "str"],
+    ret: [200, 22, 140, "retriever", "FAISS top-k"],
+    fmt: [370, 22, 130, "format_docs", "join chunks"],
+    pass: [200, 140, 300, "RunnablePassthrough()", "question unchanged"],
+    prompt: [570, 80, 130, "prompt", "template"],
+    llm: [735, 80, 130, "llm", "Mistral 7B"],
+    parser: [900, 80, 150, "StrOutputParser", "clean text"],
+    out: [1075, 80, 70, "answer", ""]
+  };
+  const H = 58;
+  const par = S("rect", { x: 182, y: 6, width: 336, height: 206, rx: 12, fill: "none", stroke: "#94A3B8", "stroke-dasharray": "6 5", "stroke-width": 2 }, svg);
+  S("text", { x: 350, y: 205, "text-anchor": "middle", "font-size": 13, fill: "#64748B", "font-weight": 700 }, svg, "RunnableParallel → {context, question}");
+  const E = (x1, y1, x2, y2) => S("path", { d: `M${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`, fill: "none", stroke: "#1C7293", "stroke-width": 2, "marker-end": "url(#lA)" }, svg);
+  E(130, 109, 198, 51); E(130, 109, 198, 169); E(340, 51, 368, 51);
+  E(500, 51, 568, 109); E(500, 169, 568, 109); E(700, 109, 733, 109); E(865, 109, 898, 109); E(1050, 109, 1073, 109);
+  const g = {};
+  for (const k in nodes) {
+    const [x, y, w, t, s] = nodes[k];
+    const grp = S("g", { style: "transition:opacity .3s" }, svg);
+    const dark = k === "llm";
+    S("rect", { x, y, width: w, height: H, rx: 10, fill: dark ? "#020938" : "#E8F4F8", stroke: "#CCDDEE", "stroke-width": 2, class: "bx" }, grp);
+    S("text", { x: x + w / 2, y: y + (s ? 25 : 34), "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: dark ? "#fff" : "#020938", "font-family": "Consolas, monospace" }, grp, t);
+    if (s) S("text", { x: x + w / 2, y: y + 45, "text-anchor": "middle", "font-size": 12.5, fill: dark ? "#A0C8E0" : "#64748B" }, grp, s);
+    g[k] = grp;
+  }
+  const Q = "What are the risk factors for diabetes?";
+  const c1 = "Risk factors for type 2 diabetes include excess body weight, physical inactivity, an unhealthy diet and a family history of the disease.";
+  const c2 = "Obesity is strongly associated with insulin resistance, which raises blood glucose over time.";
+  const c3 = "Hypertension often appears together with diabetes and further increases cardiovascular risk.";
+  const ctx = `${c1}\n\n${c2}\n\n${c3}`;
+  const steps = [
+    { on: ["in"], type: "str", title: "Input — the raw question", v: `"${Q}"` },
+    { on: ["ret"], type: "List[Document]", title: "retriever — top-k chunks from FAISS (k = 3)",
+      v: `[Document(page_content="${c1}",\n          metadata={"source": "diabetes.pdf"}),\n Document(page_content="${c2}",\n          metadata={"source": "obesity.pdf"}),\n Document(page_content="${c3}",\n          metadata={"source": "hypertension.pdf"})]` },
+    { on: ["fmt", "pass"], type: "str + str", title: "format_docs joins the chunks · passthrough keeps the question",
+      v: `# def format_docs(docs): return "\\n\\n".join(d.page_content for d in docs)\n\ncontext  = "${ctx.replace(/\n/g, "\\n")}"\n\nquestion = "${Q}"` },
+    { on: ["ret", "fmt", "pass"], par: true, type: "dict", title: "RunnableParallel merges both branches",
+      v: `{\n  "context":  "${c1}\\n\\n${c2}\\n\\n...",\n  "question": "${Q}"\n}` },
+    { on: ["prompt"], type: "PromptValue", title: "prompt fills the template",
+      v: `[INST] You are a medical assistant. Answer the question using ONLY\nthe context below. If the answer is not in the context, say you don't know.\n\nContext:\n${ctx}\n\nQuestion: ${Q} [/INST]` },
+    { on: ["llm"], type: "str (raw)", title: "llm — Mistral 7B generates (raw output, extra whitespace)",
+      v: `"  Based on the provided context, the main risk factors for type 2 diabetes are\nexcess body weight, physical inactivity, an unhealthy diet and a family history\nof the disease. Obesity also contributes through insulin resistance.\\n\\n  "` },
+    { on: ["parser", "out"], type: "str", title: "StrOutputParser — final clean answer returned by invoke()",
+      v: `"Based on the provided context, the main risk factors for type 2 diabetes are excess body weight, physical inactivity, an unhealthy diet and a family history of the disease. Obesity also contributes through insulin resistance."` }
+  ];
+  let st = 0;
+  function render() {
+    const s = steps[st];
+    const seen = new Set(steps.slice(0, st + 1).flatMap(x => x.on));
+    for (const k in g) {
+      const on = s.on.includes(k);
+      g[k].style.opacity = seen.has(k) ? 1 : 0.3;
+      g[k].querySelector(".bx").setAttribute("stroke", on ? "#F7C548" : "#CCDDEE");
+      g[k].querySelector(".bx").setAttribute("stroke-width", on ? 5 : 2);
+    }
+    par.setAttribute("stroke", s.par ? "#F7C548" : "#94A3B8");
+    par.setAttribute("stroke-width", s.par ? 4 : 2);
+    $("#lcelType").textContent = s.type;
+    $("#lcelTitle").textContent = `${st + 1}/${steps.length} · ${s.title}`;
+    $("#lcelVal").textContent = s.v;
+    $("#lcelPrev").disabled = st === 0;
+    $("#lcelNext").disabled = st === steps.length - 1;
+  }
+  $("#lcelNext").onclick = () => { st = Math.min(steps.length - 1, st + 1); render(); };
+  $("#lcelPrev").onclick = () => { st = Math.max(0, st - 1); render(); };
+  render();
+})();
+
+/* ============================== RAG TRIAD ============================== */
+(() => {
+  const svg = $("#triSvg");
+  const N = { Q: [280, 70, "Question"], C: [80, 400, "Retrieved context"], A: [480, 400, "Answer"] };
+  const edges = {
+    QA: { a: "Q", b: "A", name: "Answer relevance", color: "#065A82",
+      q: "Does the answer actually address the question?",
+      how: "cosine( embed(question), embed(answer) )",
+      low: "The answer drifts off-topic, is evasive, or only says “I don't know”.",
+      fix: "Improve the prompt; check that retrieved context is on-topic; try a different question phrasing." },
+    CA: { a: "C", b: "A", name: "Faithfulness (fidelity)", color: "#D1495B",
+      q: "Is every claim in the answer supported by the retrieved chunks?",
+      how: "Compare answer statements against the context (RAGAS uses an LLM as judge).",
+      low: "Hallucination: the model adds facts from its own memory or invents them.",
+      fix: "Stricter prompt (“use ONLY the context”), lower temperature, better retrieval." },
+    QC: { a: "Q", b: "C", name: "Context recall", color: "#2A9D8F",
+      q: "Did retrieval surface the passages needed to answer?",
+      how: "In the exercise: max cosine( answer, chunkᵢ ) over retrieved chunks, a proxy for “at least one chunk supports the answer”.",
+      low: "The needed information is not in the top-K chunks, so the LLM has nothing to ground on.",
+      fix: "Tune chunk size/overlap, increase K, try a stronger embedding model." }
+  };
+  let sel = "CA";
+  const eg = S("g", {}, svg);
+  const els = {};
+  for (const k in edges) {
+    const e = edges[k], [x1, y1] = N[e.a], [x2, y2] = N[e.b];
+    const grp = S("g", { style: "cursor:pointer" }, eg);
+    S("line", { x1, y1, x2, y2, stroke: "transparent", "stroke-width": 30 }, grp);
+    const ln = S("line", { x1, y1, x2, y2, stroke: e.color, "stroke-width": 5, "stroke-linecap": "round" }, grp);
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const off = k === "CA" ? [0, 34] : k === "QA" ? [70, -6] : [-70, -6];
+    const tx = S("text", { x: mx + off[0], y: my + off[1], "text-anchor": "middle", "font-size": 17, "font-weight": 700, fill: e.color }, grp, e.name.split(" (")[0]);
+    grp.onclick = () => { sel = k; render(); };
+    els[k] = { grp, ln, tx };
+  }
+  for (const k in N) {
+    const [x, y, t] = N[k];
+    S("circle", { cx: x, cy: y, r: 46, fill: k === "C" ? "#E8F4F8" : "#020938", stroke: "#00B4D8", "stroke-width": 3 }, svg);
+    S("text", { x, y: y + 7, "text-anchor": "middle", "font-size": 22, "font-weight": 700, fill: k === "C" ? "#020938" : "#fff", "font-family": "Georgia, serif" }, svg, k);
+    S("text", { x, y: k === "Q" ? y - 58 : y + 70, "text-anchor": "middle", "font-size": 16, fill: "#334155", "font-weight": 600 }, svg, t);
+  }
+  function render() {
+    for (const k in els) { const on = k === sel; els[k].ln.setAttribute("stroke-width", on ? 10 : 4); els[k].grp.style.opacity = on ? 1 : .45; }
+    const e = edges[sel];
+    $("#triPanel").innerHTML = `
+      <h4 style="color:${e.color};font-size:26px;margin-bottom:12px">${e.name} <span style="font-size:15px;color:#64748B;font-family:Calibri,sans-serif">(${e.a} ↔ ${e.b})</span></h4>
+      <p style="margin:0 0 12px"><b>Asks:</b> ${e.q}</p>
+      <p style="margin:0 0 12px"><b>Measured by:</b> <span class="code" style="font-size:15px">${e.how}</span></p>
+      <p style="margin:0 0 12px"><b style="color:#D1495B">Low score means:</b> ${e.low}</p>
+      <p style="margin:0"><b style="color:#2A9D8F">Try:</b> ${e.fix}</p>`;
+  }
+  render();
+})();
+
+/* ============================== START ============================== */
+fit();
+const h = parseInt(location.hash.slice(1), 10);
+go(Number.isFinite(h) ? h - 1 : 0);
+})();
+</script>
+</body>
+</html>
